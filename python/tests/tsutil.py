@@ -1651,3 +1651,50 @@ def assert_tables_equal(t1, t2, label=""):
             f"{label}: t1.num_rows {t1.num_rows} != {t2.num_rows} t2.num_rows"
         )
     assert t1 == t2
+
+
+def sort_individual_table(tables):
+    """
+    Sorts the individual table by parents-before-children.
+    """
+
+    individuals = tables.individuals
+    num_individuals = individuals.num_rows
+
+    # First find the set of individuals that have no children
+    # by creating an array of incoming edge counts
+    incoming_edge_count = np.zeros((num_individuals,), np.int64)
+    for parent in individuals.parents:
+        if parent != tskit.NULL:
+            incoming_edge_count[parent] += 1
+    todo = np.full((num_individuals + 1,), -1, np.int64)
+    sorted_individuals = np.full((num_individuals,), -1, np.int64)
+    current_todo = 0
+    todo_insertion_point = 0
+    for individual, num_edges in enumerate(incoming_edge_count):
+        if num_edges == 0:
+            todo[todo_insertion_point] = individual
+            todo_insertion_point += 1
+
+    # Now emit individuals from the set that have no children, removing their edges
+    # as we go adding new individuals to the no children set.
+    while todo[current_todo] != -1:
+        individual = todo[current_todo]
+        sorted_individuals[current_todo] = individual
+        current_todo += 1
+        for parent in individuals.parents[
+            individuals.parents_offset[individual] : individuals.parents_offset[
+                individual + 1
+            ]
+        ]:
+            incoming_edge_count[parent] -= 1
+            if incoming_edge_count[parent] == 0:
+                todo[todo_insertion_point] = parent
+                todo_insertion_point += 1
+
+    if np.sum(incoming_edge_count) > 0:
+        raise ValueError("Individual pedigree has cycles")
+
+    # TODO: Remap parents and nodes, build new table
+
+    return list(reversed(sorted_individuals))
