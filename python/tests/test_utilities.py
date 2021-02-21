@@ -150,8 +150,8 @@ class TestSortIndividuals:
         tables = tskit.TableCollection()
         tables.individuals.add_row(parents=[1], metadata=b"0")
         tables.individuals.add_row(parents=[-1], metadata=b"1")
-        ordering = tsutil.sort_individual_table(tables)
-        assert ordering == [1, 0]
+        tsutil.sort_individual_table(tables)
+        assert tables.individuals.metadata.tobytes() == b"10"
 
         tables = tskit.TableCollection()
         tables.individuals.add_row(parents=[2, 3], metadata=b"0")
@@ -161,5 +161,11 @@ class TestSortIndividuals:
         tables.individuals.add_row(parents=[3], metadata=b"4")
         tables.individuals.add_row(parents=[-1], metadata=b"5")
 
-        ordering = tsutil.sort_individual_table(tables)
-        assert ordering == [3, 5, 2, 4, 1, 0]
+        tsutil.sort_individual_table(tables)
+        assert tables.individuals.metadata.tobytes() == b"352410"
+
+        tables = tskit.TableCollection()
+        tables.individuals.add_row(parents=[1], metadata=b"0")
+        tables.individuals.add_row(parents=[0], metadata=b"1")
+        with pytest.raises(ValueError, match="Individual pedigree has cycles"):
+            tsutil.sort_individual_table(tables)

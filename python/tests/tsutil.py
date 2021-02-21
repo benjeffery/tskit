@@ -1695,6 +1695,28 @@ def sort_individual_table(tables):
     if np.sum(incoming_edge_count) > 0:
         raise ValueError("Individual pedigree has cycles")
 
-    # TODO: Remap parents and nodes, build new table
+    ind_id_map = {tskit.NULL: tskit.NULL}
 
-    return list(reversed(sorted_individuals))
+    old_individuals = list(individuals)
+    tables.individuals.clear()
+    for j, i in enumerate(reversed(sorted_individuals)):
+        ind_id_map[j] = tables.individuals.add_row(
+            flags=old_individuals[i].flags,
+            location=old_individuals[i].location,
+            parents=old_individuals[i].parents,
+            metadata=old_individuals[i].metadata,
+        )
+    tables.individuals.parents = [ind_id_map[i] for i in tables.individuals.parents]
+
+    old_nodes = list(tables.nodes)
+    tables.nodes.clear()
+    for n in old_nodes:
+        tables.nodes.add_row(
+            flags=n.flags,
+            time=n.time,
+            population=n.population,
+            individual=ind_id_map[n.individual],
+            metadata=n.metadata,
+        )
+
+    return tables
