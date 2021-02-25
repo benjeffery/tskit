@@ -1668,10 +1668,9 @@ def sort_individual_table(tables):
         if parent != tskit.NULL:
             incoming_edge_count[parent] += 1
     todo = np.full((num_individuals + 1,), -1, np.int64)
-    sorted_individuals = np.full((num_individuals,), -1, np.int64)
     current_todo = 0
     todo_insertion_point = 0
-    for individual, num_edges in enumerate(incoming_edge_count):
+    for individual, num_edges in reversed(list(enumerate(incoming_edge_count))):
         if num_edges == 0:
             todo[todo_insertion_point] = individual
             todo_insertion_point += 1
@@ -1680,17 +1679,17 @@ def sort_individual_table(tables):
     # as we go adding new individuals to the no children set.
     while todo[current_todo] != -1:
         individual = todo[current_todo]
-        sorted_individuals[current_todo] = individual
         current_todo += 1
         for parent in individuals.parents[
             individuals.parents_offset[individual] : individuals.parents_offset[
                 individual + 1
             ]
         ]:
-            incoming_edge_count[parent] -= 1
-            if incoming_edge_count[parent] == 0:
-                todo[todo_insertion_point] = parent
-                todo_insertion_point += 1
+            if parent != -1:
+                incoming_edge_count[parent] -= 1
+                if incoming_edge_count[parent] == 0:
+                    todo[todo_insertion_point] = parent
+                    todo_insertion_point += 1
 
     if np.sum(incoming_edge_count) > 0:
         raise ValueError("Individual pedigree has cycles")
@@ -1699,7 +1698,7 @@ def sort_individual_table(tables):
 
     old_individuals = list(individuals)
     tables.individuals.clear()
-    for j, i in enumerate(reversed(sorted_individuals)):
+    for j, i in enumerate(reversed(todo[:-1])):
         ind_id_map[j] = tables.individuals.add_row(
             flags=old_individuals[i].flags,
             location=old_individuals[i].location,

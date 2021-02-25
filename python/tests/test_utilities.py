@@ -157,12 +157,12 @@ class TestSortIndividuals:
         tables.individuals.add_row(parents=[2, 3], metadata=b"0")
         tables.individuals.add_row(parents=[5], metadata=b"1")
         tables.individuals.add_row(parents=[-1], metadata=b"2")
-        tables.individuals.add_row(parents=[], metadata=b"3")
+        tables.individuals.add_row(parents=[-1], metadata=b"3")
         tables.individuals.add_row(parents=[3], metadata=b"4")
-        tables.individuals.add_row(parents=[-1], metadata=b"5")
+        tables.individuals.add_row(parents=[4], metadata=b"5")
 
         tsutil.sort_individual_table(tables)
-        assert tables.individuals.metadata.tobytes() == b"352410"
+        assert tables.individuals.metadata.tobytes() == b"342501"
 
         tables = tskit.TableCollection()
         tables.individuals.add_row(parents=[1], metadata=b"0")
