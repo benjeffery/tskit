@@ -1078,6 +1078,8 @@ def py_sort(tables, use_num_descendants=False):
             copy.mutations[mut_id].time,
         )
 
+    sort_individual_table(tables)
+
 
 def algorithm_T(ts):
     """
@@ -1679,8 +1681,7 @@ def sort_individual_table(tables):
     # as we go adding new individuals to the no children set.
     while todo[current_todo] != -1:
         individual = todo[current_todo]
-        current_todo += 1
-        for parent in individuals.parents[
+        for parent in individuals.parents[  # use row getter
             individuals.parents_offset[individual] : individuals.parents_offset[
                 individual + 1
             ]
@@ -1690,32 +1691,23 @@ def sort_individual_table(tables):
                 if incoming_edge_count[parent] == 0:
                     todo[todo_insertion_point] = parent
                     todo_insertion_point += 1
+        current_todo += 1
 
     if np.sum(incoming_edge_count) > 0:
         raise ValueError("Individual pedigree has cycles")
 
     ind_id_map = {tskit.NULL: tskit.NULL}
 
-    old_individuals = list(individuals)
+    old_individuals = list(individuals)  # copy table
     tables.individuals.clear()
-    for j, i in enumerate(reversed(todo[:-1])):
-        ind_id_map[j] = tables.individuals.add_row(
-            flags=old_individuals[i].flags,
-            location=old_individuals[i].location,
-            parents=old_individuals[i].parents,
-            metadata=old_individuals[i].metadata,
+    for row in reversed(todo):
+        ind_id_map[row] = tables.individuals.add_row(
+            flags=old_individuals[row].flags,
+            location=old_individuals[row].location,
+            parents=old_individuals[row].parents,
+            metadata=old_individuals[row].metadata,
         )
     tables.individuals.parents = [ind_id_map[i] for i in tables.individuals.parents]
-
-    old_nodes = list(tables.nodes)
-    tables.nodes.clear()
-    for n in old_nodes:
-        tables.nodes.add_row(
-            flags=n.flags,
-            time=n.time,
-            population=n.population,
-            individual=ind_id_map[n.individual],
-            metadata=n.metadata,
-        )
+    tables.nodes.individuals = [ind_id_map[i] for i in tables.nodes.individuals]
 
     return tables

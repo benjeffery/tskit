@@ -507,7 +507,7 @@ class IndividualTable(BaseTable, MetadataMixin):
             if j == -1:
                 rows.append(f"__skipped__{self.num_rows-limit}")
             else:
-                md = base64.b64encode(metadata[j]).decode("utf8")
+                md = metadata[j].decode("utf8")
                 location_str = ",".join(map(str, location[j]))
                 parents_str = ",".join(map(str, parents[j]))
                 rows.append(

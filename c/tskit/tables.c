@@ -4958,16 +4958,18 @@ static int
 tsk_table_sorter_sort_individuals(tsk_table_sorter_t *self)
 {
     int ret = 0;
-    tsk_size_t i;
+    tsk_id_t i;
     tsk_individual_table_t copy;
     tsk_individual_t copy_individual;
     tsk_individual_table_t *individuals = &self->tables->individuals;
     tsk_size_t num_individuals = individuals->num_rows;
     tsk_size_t current_todo = 0;
     tsk_size_t todo_insertion_point = 0;
-    tsk_size_t *incoming_edge_count = malloc(num_individuals * sizeof(tsk_size_t));
-    tsk_id_t *individuals_todo = malloc(num_individuals * (sizeof(tsk_id_t) + 1));
-    tsk_id_t *new_id_map = malloc(num_individuals * sizeof(tsk_id_t));
+    tsk_size_t *incoming_edge_count
+        = malloc(num_individuals * sizeof(*incoming_edge_count));
+    tsk_id_t *individuals_todo
+        = malloc((num_individuals + 1) * sizeof(*individuals_todo));
+    tsk_id_t *new_id_map = malloc(num_individuals * sizeof(*new_id_map));
 
     ret = tsk_individual_table_copy(individuals, &copy, 0);
     if (ret != 0) {
@@ -4995,7 +4997,7 @@ tsk_table_sorter_sort_individuals(tsk_table_sorter_t *self)
     }
     /* Use these as the starting points for checking all individuals,
      * doing this in reverse makes the sort stable */
-    for (i = 0; i < num_individuals; i++) {
+    for (i = num_individuals - 1; i >= 0; i--) {
         if (incoming_edge_count[num_individuals - 1 - i] == 0) {
             individuals_todo[todo_insertion_point]
                 = (tsk_id_t) num_individuals - 1 - (tsk_id_t) i;
@@ -5037,25 +5039,25 @@ tsk_table_sorter_sort_individuals(tsk_table_sorter_t *self)
         tsk_individual_table_get_row_unsafe(
             &copy, individuals_todo[num_individuals - i - 1], &copy_individual);
 
-        new_id_map[individuals_todo[num_individuals - i - 1]]
-            = tsk_individual_table_add_row(individuals, copy_individual.flags,
-                copy_individual.location, copy_individual.location_length,
-                copy_individual.parents, copy_individual.parents_length,
-                copy_individual.metadata, copy_individual.metadata_length);
+        ret = tsk_individual_table_add_row(individuals, copy_individual.flags,
+            copy_individual.location, copy_individual.location_length,
+            copy_individual.parents, copy_individual.parents_length,
+            copy_individual.metadata, copy_individual.metadata_length);
         if (ret < 0) {
             goto out;
         }
+        new_id_map[individuals_todo[num_individuals - i - 1]] = ret;
     }
 
     /* Rewrite the parent ids */
     for (i = 0; i < individuals->parents_length; i++) {
-        if (individuals->parents[i] != -1) {
+        if (individuals->parents[i] != TSK_NULL) {
             individuals->parents[i] = new_id_map[individuals->parents[i]];
         }
     }
     /* Rewrite the node individual ids */
     for (i = 0; i < self->tables->nodes.num_rows; i++) {
-        if (self->tables->nodes.individual[i] != -1) {
+        if (self->tables->nodes.individual[i] != TSK_NULL) {
             self->tables->nodes.individual[i]
                 = new_id_map[self->tables->nodes.individual[i]];
         }
