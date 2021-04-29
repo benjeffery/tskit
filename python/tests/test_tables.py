@@ -1067,6 +1067,8 @@ class AssertEqualsMixin:
             assert table1.metadata_schema == tskit.MetadataSchema(None)
             table2 = table1.copy()
             table2.metadata_schema = tskit.MetadataSchema({"codec": "json"})
+            table2.metadata_schema = tskit.MetadataSchema(None)
+            assert table1 == table2
             with pytest.raises(
                 AssertionError,
                 match=f"{type(table1).__name__} metadata schemas differ: self=None "

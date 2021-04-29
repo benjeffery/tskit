@@ -408,6 +408,81 @@ class TestTableCollection(LowLevelTestCase):
             tc.equals(tc, ignore_timestamps=bad_bool)
 
 
+class TestTableMethods:
+    """
+    Tests for the low-level table methods.
+    """
+
+    @pytest.mark.parametrize(
+        "table_name",
+        [
+            "individuals",
+            "nodes",
+            "edges",
+            "migrations",
+            "sites",
+            "mutations",
+            "populations",
+            # "provenances",
+        ],
+    )
+    def test_table_extend(self, table_name, ts_fixture):
+        table = getattr(ts_fixture.tables, table_name)
+        assert len(table) >= 5
+        ll_table = table.ll_table
+        table_copy = table.copy()
+
+        ll_table.extend(ll_table)
+        assert table == table_copy
+
+        ll_table.extend(table_copy.ll_table, num_rows=0)
+        assert table == table_copy
+
+        ll_table.extend(table_copy.ll_table, row_indexes=[])
+        assert table == table_copy
+
+        # num_rows ignored if specified with row_indexes
+        ll_table.extend(table_copy.ll_table, num_rows=5, row_indexes=[])
+        assert table == table_copy
+
+        ll_table.extend(table_copy.ll_table, num_rows=1)
+        assert len(table) == len(table_copy) + 1
+        assert table[len(table) - 1] == table_copy[0]
+
+        table.truncate(0)
+        ll_table.extend(table_copy.ll_table, num_rows=len(table_copy))
+        table.assert_equals(table_copy)
+
+        table.truncate(len(table_copy))
+        ll_table.extend(table_copy.ll_table, row_indexes=[0])
+        assert len(table) == len(table_copy) + 1
+        assert table[len(table) - 1] == table_copy[0]
+
+        table.truncate(len(table_copy))
+        ll_table.extend(table_copy.ll_table, row_indexes=[4, 1, 3])
+        assert len(table) == len(table_copy) + 3
+        assert table[len(table_copy)] == table_copy[4]
+        assert table[len(table_copy) + 1] == table_copy[1]
+        assert table[len(table_copy) + 2] == table_copy[3]
+
+        # Copy from self
+        table.truncate(len(table_copy))
+        ll_table.extend(ll_table, row_indexes=[0, 0, 3])
+        assert len(table) == len(table_copy) + 3
+        table[len(table_copy) + 1]
+        assert table[len(table_copy)] == table_copy[0]
+        assert table[len(table_copy) + 1] == table_copy[0]
+        assert table[len(table_copy) + 2] == table_copy[3]
+
+        # Iterator argument
+        table.truncate(len(table_copy))
+        ll_table.extend(ll_table, row_indexes=range(2, -1, -1))
+        assert len(table) == len(table_copy) + 3
+        assert table[len(table_copy)] == table_copy[2]
+        assert table[len(table_copy) + 1] == table_copy[1]
+        assert table[len(table_copy) + 2] == table_copy[0]
+
+
 class TestTableMethodsErrors:
     """
     Tests for the error handling of errors in the low-level tables.
@@ -416,6 +491,48 @@ class TestTableMethodsErrors:
     def yield_tables(self, ts):
         for table in ts.tables.name_map.values():
             yield table.ll_table
+
+    @pytest.mark.parametrize(
+        "table_name",
+        [
+            "individuals",
+            "nodes",
+            "edges",
+            "migrations",
+            "sites",
+            "mutations",
+            "populations",
+            # "provenances",
+        ],
+    )
+    def test_table_extend_bad_args(self, ts_fixture, table_name):
+        ll_table = getattr(ts_fixture.tables, table_name).ll_table
+
+        with pytest.raises(TypeError):
+            ll_table.extend(None, row_indexes=[])
+        ll_table.extend(ll_table, row_indexes=None)
+        with pytest.raises(ValueError):
+            ll_table.extend(ll_table, row_indexes=5)
+        with pytest.raises(_tskit.LibraryError, match="out of bounds"):
+            ll_table.extend(ll_table, row_indexes=[-1])
+        with pytest.raises(_tskit.LibraryError, match="out of bounds"):
+            ll_table.extend(ll_table, row_indexes=[1000])
+        with pytest.raises(_tskit.LibraryError, match="out of bounds"):
+            ll_table.extend(ll_table, row_indexes=range(10000000, 10000001))
+        with pytest.raises(TypeError):
+            ll_table.extend(ll_table, num_rows=[])
+        with pytest.raises(TypeError):
+            ll_table.extend(ll_table, num_rows=None)
+        with pytest.raises(TypeError):
+            ll_table.extend(ll_table, num_rows=None, row_indexes=[])
+        with pytest.raises(
+            ValueError, match="num_rows must be 0 <= n <= other.num_rows"
+        ):
+            ll_table.extend(ll_table, num_rows=424242)
+        with pytest.raises(
+            ValueError, match="num_rows must be 0 <= n <= other.num_rows"
+        ):
+            ll_table.extend(ll_table, num_rows=-1)
 
     def test_equals_bad_args(self, ts_fixture):
         for ll_table in self.yield_tables(ts_fixture):

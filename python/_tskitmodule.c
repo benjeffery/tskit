@@ -327,6 +327,8 @@ static PyObject *
 make_provenance(const tsk_provenance_t *provenance)
 {
     PyObject *ret = NULL;
+    printf("\n\nWTF\n %d %.*s", provenance->record_length, provenance->record_length,
+        provenance->record);
 
     ret = Py_BuildValue("s#s#", provenance->timestamp,
         (Py_ssize_t) provenance->timestamp_length, provenance->record,
@@ -1046,6 +1048,59 @@ out:
 }
 
 static PyObject *
+IndividualTable_extend(IndividualTable *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *ret = NULL;
+    IndividualTable *other = NULL;
+    PyObject *obj_row_indexes = Py_None;
+    PyArrayObject *row_indexes = NULL;
+    tsk_id_t *row_indexes_data = NULL;
+    Py_ssize_t num_rows = 0;
+    int err;
+    static char *kwlist[] = { "other", "num_rows", "row_indexes", NULL };
+
+    if (IndividualTable_check_state(self) != 0) {
+        goto out;
+    }
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|$nO", kwlist, &IndividualTableType,
+            &other, &num_rows, &obj_row_indexes)) {
+        goto out;
+    }
+    if (IndividualTable_check_state(other) != 0) {
+        goto out;
+    }
+
+    // We check this here as for the C API method n can be the size of the
+    // row_indexes array, but for python we know that size so n can only be
+    // a number of rows from other
+    if (num_rows > other->table->num_rows || num_rows < 0) {
+        PyErr_SetString(PyExc_ValueError, "num_rows must be 0 <= n <= other.num_rows");
+        goto out;
+    }
+
+    if (obj_row_indexes != Py_None) {
+        row_indexes = (PyArrayObject *) PyArray_FromAny(obj_row_indexes,
+            PyArray_DescrFromType(NPY_INT32), 1, 1, NPY_ARRAY_IN_ARRAY, NULL);
+        if (row_indexes == NULL) {
+            goto out;
+        }
+        num_rows = PyArray_DIMS(row_indexes)[0];
+        row_indexes_data = PyArray_DATA(row_indexes);
+    }
+
+    err = tsk_individual_table_extend(
+        self->table, other->table, num_rows, row_indexes_data, 0);
+    if (err != 0) {
+        handle_library_error(err);
+        goto out;
+    }
+    ret = Py_BuildValue("");
+out:
+    Py_XDECREF(row_indexes);
+    return ret;
+}
+
+static PyObject *
 IndividualTable_get_max_rows_increment(IndividualTable *self, void *closure)
 {
     PyObject *ret = NULL;
@@ -1286,6 +1341,10 @@ static PyMethodDef IndividualTable_methods[] = {
         .ml_meth = (PyCFunction) IndividualTable_truncate,
         .ml_flags = METH_VARARGS,
         .ml_doc = "Truncates this table to the specified number of rows." },
+    { .ml_name = "extend",
+        .ml_meth = (PyCFunction) IndividualTable_extend,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Extend this table from another using optional specifed row_indexes" },
     { NULL } /* Sentinel */
 };
 
@@ -1546,6 +1605,59 @@ out:
 }
 
 static PyObject *
+NodeTable_extend(NodeTable *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *ret = NULL;
+    NodeTable *other = NULL;
+    PyObject *obj_row_indexes = Py_None;
+    PyArrayObject *row_indexes = NULL;
+    tsk_id_t *row_indexes_data = NULL;
+    Py_ssize_t num_rows = 0;
+    int err;
+    static char *kwlist[] = { "other", "num_rows", "row_indexes", NULL };
+
+    if (NodeTable_check_state(self) != 0) {
+        goto out;
+    }
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|$nO", kwlist, &NodeTableType,
+            &other, &num_rows, &obj_row_indexes)) {
+        goto out;
+    }
+    if (NodeTable_check_state(other) != 0) {
+        goto out;
+    }
+
+    // We check this here as for the C API method n can be the size of the
+    // row_indexes array, but for python we know that size so n can only be
+    // a number of rows from other
+    if (num_rows > other->table->num_rows || num_rows < 0) {
+        PyErr_SetString(PyExc_ValueError, "num_rows must be 0 <= n <= other.num_rows");
+        goto out;
+    }
+
+    if (obj_row_indexes != Py_None) {
+        row_indexes = (PyArrayObject *) PyArray_FromAny(obj_row_indexes,
+            PyArray_DescrFromType(NPY_INT32), 1, 1, NPY_ARRAY_IN_ARRAY, NULL);
+        if (row_indexes == NULL) {
+            goto out;
+        }
+        num_rows = PyArray_DIMS(row_indexes)[0];
+        row_indexes_data = PyArray_DATA(row_indexes);
+    }
+
+    err = tsk_node_table_extend(
+        self->table, other->table, num_rows, row_indexes_data, 0);
+    if (err != 0) {
+        handle_library_error(err);
+        goto out;
+    }
+    ret = Py_BuildValue("");
+out:
+    Py_XDECREF(row_indexes);
+    return ret;
+}
+
+static PyObject *
 NodeTable_get_max_rows_increment(NodeTable *self, void *closure)
 {
     PyObject *ret = NULL;
@@ -1765,6 +1877,11 @@ static PyMethodDef NodeTable_methods[] = {
         .ml_meth = (PyCFunction) NodeTable_truncate,
         .ml_flags = METH_VARARGS,
         .ml_doc = "Truncates this table to the specified number of rows." },
+    { .ml_name = "extend",
+        .ml_meth = (PyCFunction) NodeTable_extend,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Extend this table from another using optional specifed row_indexes" },
+
     { NULL } /* Sentinel */
 };
 
@@ -2041,6 +2158,59 @@ out:
 }
 
 static PyObject *
+EdgeTable_extend(EdgeTable *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *ret = NULL;
+    EdgeTable *other = NULL;
+    PyObject *obj_row_indexes = Py_None;
+    PyArrayObject *row_indexes = NULL;
+    tsk_id_t *row_indexes_data = NULL;
+    Py_ssize_t num_rows = 0;
+    int err;
+    static char *kwlist[] = { "other", "num_rows", "row_indexes", NULL };
+
+    if (EdgeTable_check_state(self) != 0) {
+        goto out;
+    }
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|$nO", kwlist, &EdgeTableType,
+            &other, &num_rows, &obj_row_indexes)) {
+        goto out;
+    }
+    if (EdgeTable_check_state(other) != 0) {
+        goto out;
+    }
+
+    // We check this here as for the C API method n can be the size of the
+    // row_indexes array, but for python we know that size so n can only be
+    // a number of rows from other
+    if (num_rows > other->table->num_rows || num_rows < 0) {
+        PyErr_SetString(PyExc_ValueError, "num_rows must be 0 <= n <= other.num_rows");
+        goto out;
+    }
+
+    if (obj_row_indexes != Py_None) {
+        row_indexes = (PyArrayObject *) PyArray_FromAny(obj_row_indexes,
+            PyArray_DescrFromType(NPY_INT32), 1, 1, NPY_ARRAY_IN_ARRAY, NULL);
+        if (row_indexes == NULL) {
+            goto out;
+        }
+        num_rows = PyArray_DIMS(row_indexes)[0];
+        row_indexes_data = PyArray_DATA(row_indexes);
+    }
+
+    err = tsk_edge_table_extend(
+        self->table, other->table, num_rows, row_indexes_data, 0);
+    if (err != 0) {
+        handle_library_error(err);
+        goto out;
+    }
+    ret = Py_BuildValue("");
+out:
+    Py_XDECREF(row_indexes);
+    return ret;
+}
+
+static PyObject *
 EdgeTable_get_max_rows_increment(EdgeTable *self, void *closure)
 {
     PyObject *ret = NULL;
@@ -2258,6 +2428,11 @@ static PyMethodDef EdgeTable_methods[] = {
         .ml_meth = (PyCFunction) EdgeTable_truncate,
         .ml_flags = METH_VARARGS,
         .ml_doc = "Truncates this table to the specified number of rows." },
+    { .ml_name = "extend",
+        .ml_meth = (PyCFunction) EdgeTable_extend,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Extend this table from another using optional specifed row_indexes" },
+
     { .ml_name = "squash",
         .ml_meth = (PyCFunction) EdgeTable_squash,
         .ml_flags = METH_NOARGS,
@@ -2519,6 +2694,59 @@ out:
 }
 
 static PyObject *
+MigrationTable_extend(MigrationTable *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *ret = NULL;
+    MigrationTable *other = NULL;
+    PyObject *obj_row_indexes = Py_None;
+    PyArrayObject *row_indexes = NULL;
+    tsk_id_t *row_indexes_data = NULL;
+    Py_ssize_t num_rows = 0;
+    int err;
+    static char *kwlist[] = { "other", "num_rows", "row_indexes", NULL };
+
+    if (MigrationTable_check_state(self) != 0) {
+        goto out;
+    }
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|$nO", kwlist, &MigrationTableType,
+            &other, &num_rows, &obj_row_indexes)) {
+        goto out;
+    }
+    if (MigrationTable_check_state(other) != 0) {
+        goto out;
+    }
+
+    // We check this here as for the C API method n can be the size of the
+    // row_indexes array, but for python we know that size so n can only be
+    // a number of rows from other
+    if (num_rows > other->table->num_rows || num_rows < 0) {
+        PyErr_SetString(PyExc_ValueError, "num_rows must be 0 <= n <= other.num_rows");
+        goto out;
+    }
+
+    if (obj_row_indexes != Py_None) {
+        row_indexes = (PyArrayObject *) PyArray_FromAny(obj_row_indexes,
+            PyArray_DescrFromType(NPY_INT32), 1, 1, NPY_ARRAY_IN_ARRAY, NULL);
+        if (row_indexes == NULL) {
+            goto out;
+        }
+        num_rows = PyArray_DIMS(row_indexes)[0];
+        row_indexes_data = PyArray_DATA(row_indexes);
+    }
+
+    err = tsk_migration_table_extend(
+        self->table, other->table, num_rows, row_indexes_data, 0);
+    if (err != 0) {
+        handle_library_error(err);
+        goto out;
+    }
+    ret = Py_BuildValue("");
+out:
+    Py_XDECREF(row_indexes);
+    return ret;
+}
+
+static PyObject *
 MigrationTable_get_max_rows_increment(MigrationTable *self, void *closure)
 {
     PyObject *ret = NULL;
@@ -2768,6 +2996,11 @@ static PyMethodDef MigrationTable_methods[] = {
         .ml_meth = (PyCFunction) MigrationTable_truncate,
         .ml_flags = METH_VARARGS,
         .ml_doc = "Truncates this table to the specified number of rows." },
+    { .ml_name = "extend",
+        .ml_meth = (PyCFunction) MigrationTable_extend,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Extend this table from another using optional specifed row_indexes" },
+
     { NULL } /* Sentinel */
 };
 
@@ -3024,6 +3257,59 @@ out:
 }
 
 static PyObject *
+SiteTable_extend(SiteTable *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *ret = NULL;
+    SiteTable *other = NULL;
+    PyObject *obj_row_indexes = Py_None;
+    PyArrayObject *row_indexes = NULL;
+    tsk_id_t *row_indexes_data = NULL;
+    Py_ssize_t num_rows = 0;
+    int err;
+    static char *kwlist[] = { "other", "num_rows", "row_indexes", NULL };
+
+    if (SiteTable_check_state(self) != 0) {
+        goto out;
+    }
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|$nO", kwlist, &SiteTableType,
+            &other, &num_rows, &obj_row_indexes)) {
+        goto out;
+    }
+    if (SiteTable_check_state(other) != 0) {
+        goto out;
+    }
+
+    // We check this here as for the C API method n can be the size of the
+    // row_indexes array, but for python we know that size so n can only be
+    // a number of rows from other
+    if (num_rows > other->table->num_rows || num_rows < 0) {
+        PyErr_SetString(PyExc_ValueError, "num_rows must be 0 <= n <= other.num_rows");
+        goto out;
+    }
+
+    if (obj_row_indexes != Py_None) {
+        row_indexes = (PyArrayObject *) PyArray_FromAny(obj_row_indexes,
+            PyArray_DescrFromType(NPY_INT32), 1, 1, NPY_ARRAY_IN_ARRAY, NULL);
+        if (row_indexes == NULL) {
+            goto out;
+        }
+        num_rows = PyArray_DIMS(row_indexes)[0];
+        row_indexes_data = PyArray_DATA(row_indexes);
+    }
+
+    err = tsk_site_table_extend(
+        self->table, other->table, num_rows, row_indexes_data, 0);
+    if (err != 0) {
+        handle_library_error(err);
+        goto out;
+    }
+    ret = Py_BuildValue("");
+out:
+    Py_XDECREF(row_indexes);
+    return ret;
+}
+
+static PyObject *
 SiteTable_get_max_rows_increment(SiteTable *self, void *closure)
 {
     PyObject *ret = NULL;
@@ -3230,6 +3516,11 @@ static PyMethodDef SiteTable_methods[] = {
         .ml_meth = (PyCFunction) SiteTable_truncate,
         .ml_flags = METH_VARARGS,
         .ml_doc = "Truncates this table to the specified number of rows." },
+    { .ml_name = "extend",
+        .ml_meth = (PyCFunction) SiteTable_extend,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Extend this table from another using optional specifed row_indexes" },
+
     { NULL } /* Sentinel */
 };
 
@@ -3492,6 +3783,59 @@ out:
 }
 
 static PyObject *
+MutationTable_extend(MutationTable *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *ret = NULL;
+    MutationTable *other = NULL;
+    PyObject *obj_row_indexes = Py_None;
+    PyArrayObject *row_indexes = NULL;
+    tsk_id_t *row_indexes_data = NULL;
+    Py_ssize_t num_rows = 0;
+    int err;
+    static char *kwlist[] = { "other", "num_rows", "row_indexes", NULL };
+
+    if (MutationTable_check_state(self) != 0) {
+        goto out;
+    }
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|$nO", kwlist, &MutationTableType,
+            &other, &num_rows, &obj_row_indexes)) {
+        goto out;
+    }
+    if (MutationTable_check_state(other) != 0) {
+        goto out;
+    }
+
+    // We check this here as for the C API method n can be the size of the
+    // row_indexes array, but for python we know that size so n can only be
+    // a number of rows from other
+    if (num_rows > other->table->num_rows || num_rows < 0) {
+        PyErr_SetString(PyExc_ValueError, "num_rows must be 0 <= n <= other.num_rows");
+        goto out;
+    }
+
+    if (obj_row_indexes != Py_None) {
+        row_indexes = (PyArrayObject *) PyArray_FromAny(obj_row_indexes,
+            PyArray_DescrFromType(NPY_INT32), 1, 1, NPY_ARRAY_IN_ARRAY, NULL);
+        if (row_indexes == NULL) {
+            goto out;
+        }
+        num_rows = PyArray_DIMS(row_indexes)[0];
+        row_indexes_data = PyArray_DATA(row_indexes);
+    }
+
+    err = tsk_mutation_table_extend(
+        self->table, other->table, num_rows, row_indexes_data, 0);
+    if (err != 0) {
+        handle_library_error(err);
+        goto out;
+    }
+    ret = Py_BuildValue("");
+out:
+    Py_XDECREF(row_indexes);
+    return ret;
+}
+
+static PyObject *
 MutationTable_get_max_rows_increment(MutationTable *self, void *closure)
 {
     PyObject *ret = NULL;
@@ -3743,6 +4087,11 @@ static PyMethodDef MutationTable_methods[] = {
         .ml_meth = (PyCFunction) MutationTable_truncate,
         .ml_flags = METH_VARARGS,
         .ml_doc = "Truncates this table to the specified number of rows." },
+    { .ml_name = "extend",
+        .ml_meth = (PyCFunction) MutationTable_extend,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Extend this table from another using optional specifed row_indexes" },
+
     { NULL } /* Sentinel */
 };
 
@@ -3997,6 +4346,59 @@ out:
 }
 
 static PyObject *
+PopulationTable_extend(PopulationTable *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *ret = NULL;
+    PopulationTable *other = NULL;
+    PyObject *obj_row_indexes = Py_None;
+    PyArrayObject *row_indexes = NULL;
+    tsk_id_t *row_indexes_data = NULL;
+    Py_ssize_t num_rows = 0;
+    int err;
+    static char *kwlist[] = { "other", "num_rows", "row_indexes", NULL };
+
+    if (PopulationTable_check_state(self) != 0) {
+        goto out;
+    }
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|$nO", kwlist, &PopulationTableType,
+            &other, &num_rows, &obj_row_indexes)) {
+        goto out;
+    }
+    if (PopulationTable_check_state(other) != 0) {
+        goto out;
+    }
+
+    // We check this here as for the C API method n can be the size of the
+    // row_indexes array, but for python we know that size so n can only be
+    // a number of rows from other
+    if (num_rows > other->table->num_rows || num_rows < 0) {
+        PyErr_SetString(PyExc_ValueError, "num_rows must be 0 <= n <= other.num_rows");
+        goto out;
+    }
+
+    if (obj_row_indexes != Py_None) {
+        row_indexes = (PyArrayObject *) PyArray_FromAny(obj_row_indexes,
+            PyArray_DescrFromType(NPY_INT32), 1, 1, NPY_ARRAY_IN_ARRAY, NULL);
+        if (row_indexes == NULL) {
+            goto out;
+        }
+        num_rows = PyArray_DIMS(row_indexes)[0];
+        row_indexes_data = PyArray_DATA(row_indexes);
+    }
+
+    err = tsk_population_table_extend(
+        self->table, other->table, num_rows, row_indexes_data, 0);
+    if (err != 0) {
+        handle_library_error(err);
+        goto out;
+    }
+    ret = Py_BuildValue("");
+out:
+    Py_XDECREF(row_indexes);
+    return ret;
+}
+
+static PyObject *
 PopulationTable_get_max_rows_increment(PopulationTable *self, void *closure)
 {
     PyObject *ret = NULL;
@@ -4153,6 +4555,11 @@ static PyMethodDef PopulationTable_methods[] = {
         .ml_meth = (PyCFunction) PopulationTable_truncate,
         .ml_flags = METH_VARARGS,
         .ml_doc = "Truncates this table to the specified number of rows." },
+    { .ml_name = "extend",
+        .ml_meth = (PyCFunction) PopulationTable_extend,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Extend this table from another using optional specifed row_indexes" },
+
     { NULL } /* Sentinel */
 };
 
@@ -4403,6 +4810,60 @@ out:
     return ret;
 }
 
+// static PyObject *
+// ProvenanceTable_extend(ProvenanceTable *self, PyObject *args, PyObject *kwds)
+// {
+//     PyObject *ret = NULL;
+//     ProvenanceTable *other = NULL;
+//     PyObject *obj_row_indexes = Py_None;
+//     PyArrayObject *row_indexes = NULL;
+//     tsk_id_t *row_indexes_data = NULL;
+//     Py_ssize_t num_rows = 0;
+//     int err;
+//     static char *kwlist[] = { "other", "num_rows", "row_indexes", NULL };
+
+//     if (ProvenanceTable_check_state(self) != 0) {
+//         goto out;
+//     }
+//     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!|$nO", kwlist,
+//     &ProvenanceTableType,
+//             &other, &num_rows, &obj_row_indexes)) {
+//         goto out;
+//     }
+//     if (ProvenanceTable_check_state(other) != 0) {
+//         goto out;
+//     }
+
+//     // We check this here as for the C API method n can be the size of the
+//     // row_indexes array, but for python we know that size so n can only be
+//     // a number of rows from other
+//     if (num_rows > other->table->num_rows || num_rows < 0) {
+//         PyErr_SetString(PyExc_ValueError, "num_rows must be 0 <= n <=
+//         other.num_rows"); goto out;
+//     }
+
+//     if (obj_row_indexes != Py_None) {
+//         row_indexes = (PyArrayObject *) PyArray_FromAny(obj_row_indexes,
+//             PyArray_DescrFromType(NPY_INT32), 1, 1, NPY_ARRAY_IN_ARRAY, NULL);
+//         if (row_indexes == NULL) {
+//             goto out;
+//         }
+//         num_rows = PyArray_DIMS(row_indexes)[0];
+//         row_indexes_data = PyArray_DATA(row_indexes);
+//     }
+
+//     err = tsk_provenance_table_extend(
+//         self->table, other->table, num_rows, row_indexes_data, 0);
+//     if (err != 0) {
+//         handle_library_error(err);
+//         goto out;
+//     }
+//     ret = Py_BuildValue("");
+// out:
+//     Py_XDECREF(row_indexes);
+//     return ret;
+// }
+
 static PyObject *
 ProvenanceTable_get_max_rows_increment(ProvenanceTable *self, void *closure)
 {
@@ -4550,6 +5011,12 @@ static PyMethodDef ProvenanceTable_methods[] = {
         .ml_meth = (PyCFunction) ProvenanceTable_truncate,
         .ml_flags = METH_VARARGS,
         .ml_doc = "Truncates this table to the specified number of rows." },
+    // { .ml_name = "extend",
+    //     .ml_meth = (PyCFunction) ProvenanceTable_extend,
+    //     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+    //     .ml_doc = "Extend this table from another using optional specifed row_indexes"
+    //     },
+
     { NULL } /* Sentinel */
 };
 

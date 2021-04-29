@@ -760,7 +760,6 @@ tsk_individual_table_get_row(
     const tsk_individual_table_t *self, tsk_id_t index, tsk_individual_t *row)
 {
     int ret = 0;
-
     if (index < 0 || index >= (tsk_id_t) self->num_rows) {
         ret = TSK_ERR_INDIVIDUAL_OUT_OF_BOUNDS;
         goto out;
@@ -4584,6 +4583,7 @@ tsk_provenance_table_extend(tsk_provenance_table_t *self,
         if (ret != 0) {
             goto out;
         }
+        printf("%d %s", provenance.record_length, provenance.record);
         ret = tsk_provenance_table_add_row(self, provenance.timestamp,
             provenance.timestamp_length, provenance.record, provenance.record_length);
         if (ret < 0) {
