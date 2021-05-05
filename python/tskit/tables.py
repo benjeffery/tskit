@@ -27,6 +27,7 @@ import dataclasses
 import datetime
 import itertools
 import json
+import numbers
 import sys
 import warnings
 from dataclasses import dataclass
@@ -340,11 +341,42 @@ class BaseTable:
 
         :param int index: the zero-index of the desired row
         """
-        if index < 0:
-            index += len(self)
-        if index < 0 or index >= len(self):
-            raise IndexError("Index out of bounds")
-        return self.row_class(*self.ll_table.get_row(index))
+
+        # Don't forget [0:n] quick path
+
+        if isinstance(index, numbers.Integral):
+            # Single row by integer
+            if index < 0:
+                index += len(self)
+            if index < 0 or index >= len(self):
+                raise IndexError("Index out of bounds")
+            return self.row_class(*self.ll_table.get_row(index))
+        elif isinstance(index, numbers.Number):
+            raise TypeError("index must be integer, slice or iterable")
+        elif isinstance(index, slice):
+            step = 1 if index.step is None else index.step
+            start = (
+                (0 if step >= 0 else self.num_rows - 1)
+                if index.start is None
+                else index.start
+            )
+            stop = (
+                (self.num_rows if step >= 0 else -1)
+                if index.stop is None
+                else index.stop
+            )
+            index = range(start, stop, step)
+        else:
+            index = np.asarray(index)
+            if index.dtype == bool:
+                index = np.flatnonzero(index)
+            index = index.astype(np.int32)
+
+        ret = self.__class__()
+        ret.metadata_schema = self.metadata_schema
+        ret.ll_table.extend(self.ll_table, row_indexes=index)
+
+        return ret
 
     def append(self, row):
         """
