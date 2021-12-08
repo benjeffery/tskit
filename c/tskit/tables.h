@@ -1019,6 +1019,11 @@ int tsk_individual_table_set_columns(tsk_individual_table_t *self, tsk_size_t nu
     const tsk_id_t *parents, const tsk_size_t *parents_offset, const char *metadata,
     const tsk_size_t *metadata_offset);
 
+int tsk_individual_table_takeset_columns(tsk_individual_table_t *self,
+    tsk_size_t num_rows, tsk_flags_t *flags, double *location,
+    tsk_size_t *location_offset, tsk_id_t *parents, tsk_size_t *parents_offset,
+    char *metadata, tsk_size_t *metadata_offset);
+
 /**
 @brief Extends this table by copying from a set of column arrays
 
@@ -1360,6 +1365,10 @@ The metadata schema is not affected.
 int tsk_node_table_set_columns(tsk_node_table_t *self, tsk_size_t num_rows,
     const tsk_flags_t *flags, const double *time, const tsk_id_t *population,
     const tsk_id_t *individual, const char *metadata, const tsk_size_t *metadata_offset);
+
+int tsk_node_table_takeset_columns(tsk_node_table_t *self, tsk_size_t num_rows,
+    tsk_flags_t *flags, double *time, tsk_id_t *population, tsk_id_t *individual,
+    char *metadata, tsk_size_t *metadata_offset);
 
 /**
 @brief Extends this table by copying from a set of column arrays
