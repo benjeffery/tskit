@@ -642,28 +642,27 @@ out:
 }
 
 static int
-takeset_metadata_column(tsk_size_t num_rows, char *metadata, tsk_size_t *metadata_offset,
-    char **metadata_dest, tsk_size_t **metadata_offset_dest)
+takeset_ragged_column(tsk_size_t num_rows, void *data, tsk_size_t *offset,
+    void **data_dest, tsk_size_t **offset_dest)
 {
     int ret = 0;
 
-    if ((metadata == NULL) != (metadata_offset == NULL)) {
+    if ((data == NULL) != (offset == NULL)) {
         ret = TSK_ERR_BAD_PARAM_VALUE;
         goto out;
     }
-    if (metadata == NULL) {
-        ret = alloc_empty_ragged_column(
-            num_rows, (void *) metadata_dest, metadata_offset_dest);
+    if (data == NULL) {
+        ret = alloc_empty_ragged_column(num_rows, (void *) data_dest, offset_dest);
         if (ret != 0) {
             goto out;
         }
     } else {
-        ret = check_offsets(num_rows, metadata_offset, 0, false);
+        ret = check_offsets(num_rows, offset, 0, false);
         if (ret != 0) {
             goto out;
         }
-        *metadata_dest = metadata;
-        *metadata_offset_dest = metadata_offset;
+        *data_dest = data;
+        *offset_dest = offset;
     }
 out:
     return ret;
@@ -684,7 +683,7 @@ takeset_optional_id_column(tsk_size_t num_rows, tsk_id_t *input, tsk_id_t **dest
             goto out;
         }
         *dest = buff;
-        memset(buff, 0xff, buffsize);
+        tsk_memset(buff, 0xff, buffsize);
     } else {
         *dest = input;
     }
@@ -1087,46 +1086,18 @@ tsk_individual_table_takeset_columns(tsk_individual_table_t *self, tsk_size_t nu
         self->flags = flags;
     }
 
-    if ((location == NULL) != (location_offset == NULL)) {
-        ret = TSK_ERR_BAD_PARAM_VALUE;
+    ret = takeset_ragged_column(num_rows, location, location_offset,
+        (void *) &self->location, &self->location_offset);
+    if (ret != 0) {
         goto out;
     }
-    if (location == NULL) {
-        ret = alloc_empty_ragged_column(
-            num_rows, (void *) &self->location, &self->location_offset);
-        if (ret != 0) {
-            goto out;
-        }
-    } else {
-        ret = check_offsets(num_rows, location_offset, 0, false);
-        if (ret != 0) {
-            goto out;
-        }
-        self->location = location;
-        self->location_offset = location_offset;
-    }
-
-    if ((parents == NULL) != (parents_offset == NULL)) {
-        ret = TSK_ERR_BAD_PARAM_VALUE;
+    ret = takeset_ragged_column(num_rows, parents, parents_offset,
+        (void *) &self->parents, &self->parents_offset);
+    if (ret != 0) {
         goto out;
     }
-    if (parents == NULL) {
-        ret = alloc_empty_ragged_column(
-            num_rows, (void *) &self->parents, &self->parents_offset);
-        if (ret != 0) {
-            goto out;
-        }
-    } else {
-        ret = check_offsets(num_rows, parents_offset, 0, false);
-        if (ret != 0) {
-            goto out;
-        }
-        self->parents = parents;
-        self->parents_offset = parents_offset;
-    }
-
-    ret = takeset_metadata_column(
-        num_rows, metadata, metadata_offset, &self->metadata, &self->metadata_offset);
+    ret = takeset_ragged_column(num_rows, metadata, metadata_offset,
+        (void *) &self->metadata, &self->metadata_offset);
     if (ret != 0) {
         goto out;
     }
@@ -1854,6 +1825,9 @@ tsk_node_table_takeset_columns(tsk_node_table_t *self, tsk_size_t num_rows,
         ret = TSK_ERR_BAD_PARAM_VALUE;
         goto out;
     }
+    self->flags = flags;
+    self->time = time;
+
     ret = takeset_optional_id_column(num_rows, population, &self->population);
     if (ret != 0) {
         goto out;
@@ -1862,8 +1836,8 @@ tsk_node_table_takeset_columns(tsk_node_table_t *self, tsk_size_t num_rows,
     if (ret != 0) {
         goto out;
     }
-    ret = takeset_metadata_column(
-        num_rows, metadata, metadata_offset, &self->metadata, &self->metadata_offset);
+    ret = takeset_ragged_column(num_rows, metadata, metadata_offset,
+        (void *) &self->metadata, &self->metadata_offset);
     if (ret != 0) {
         goto out;
     }
