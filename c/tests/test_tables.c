@@ -4050,6 +4050,143 @@ test_individual_table(void)
 }
 
 static void
+test_individual_table_takeset(void)
+{
+    int ret = 0;
+    tsk_id_t ret_id;
+    tsk_individual_table_t source_table, table;
+    tsk_size_t num_rows = 100;
+    tsk_id_t j;
+    tsk_size_t k;
+    tsk_flags_t *flags;
+    double *location;
+    tsk_id_t *parents;
+    char *metadata;
+    tsk_size_t *metadata_offset;
+    tsk_size_t *parents_offset;
+    tsk_size_t *location_offset;
+    tsk_size_t spatial_dimension = 2;
+    tsk_size_t num_parents = 3;
+    const char *test_metadata = "test";
+    tsk_size_t test_metadata_length = 4;
+    double test_location[spatial_dimension];
+    tsk_id_t test_parents[num_parents];
+    tsk_size_t zeros[num_rows + 1];
+
+    tsk_memset(zeros, 0, (num_rows + 1) * sizeof(tsk_size_t));
+    /* Make a table to copy from */
+    ret = tsk_individual_table_init(&source_table, 0);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+    for (k = 0; k < spatial_dimension; k++) {
+        test_location[k] = (double) k;
+    }
+    for (k = 0; k < num_parents; k++) {
+        test_parents[k] = (tsk_id_t) k + 42;
+    }
+    for (j = 0; j < (tsk_id_t) num_rows; j++) {
+        ret_id = tsk_individual_table_add_row(&source_table, (tsk_flags_t) j,
+            test_location, spatial_dimension, test_parents, num_parents, test_metadata,
+            test_metadata_length);
+        CU_ASSERT_EQUAL_FATAL(ret_id, j);
+    }
+
+    /* Prepare arrays to be taken */
+    flags = tsk_malloc(num_rows * sizeof(tsk_flags_t));
+    CU_ASSERT_FATAL(flags != NULL);
+    tsk_memcpy(flags, source_table.flags, num_rows * sizeof(tsk_flags_t));
+    location = tsk_malloc(spatial_dimension * num_rows * sizeof(double));
+    CU_ASSERT_FATAL(location != NULL);
+    tsk_memcpy(
+        location, source_table.location, spatial_dimension * num_rows * sizeof(double));
+    location_offset = tsk_malloc((num_rows + 1) * sizeof(tsk_size_t));
+    CU_ASSERT_FATAL(location_offset != NULL);
+    tsk_memcpy(location_offset, source_table.location_offset,
+        (num_rows + 1) * sizeof(tsk_size_t));
+    parents = tsk_malloc(num_parents * num_rows * sizeof(tsk_id_t));
+    CU_ASSERT_FATAL(parents != NULL);
+    tsk_memcpy(parents, source_table.parents, num_parents * num_rows * sizeof(tsk_id_t));
+    parents_offset = tsk_malloc((num_rows + 1) * sizeof(tsk_size_t));
+    CU_ASSERT_FATAL(parents_offset != NULL);
+    tsk_memcpy(parents_offset, source_table.parents_offset,
+        (num_rows + 1) * sizeof(tsk_size_t));
+    metadata = tsk_malloc(num_rows * test_metadata_length * sizeof(char));
+    CU_ASSERT_FATAL(metadata != NULL);
+    tsk_memcpy(
+        metadata, source_table.metadata, num_rows * test_metadata_length * sizeof(char));
+    metadata_offset = tsk_malloc((num_rows + 1) * sizeof(tsk_size_t));
+    CU_ASSERT_FATAL(metadata_offset != NULL);
+    tsk_memcpy(metadata_offset, source_table.metadata_offset,
+        (num_rows + 1) * sizeof(tsk_size_t));
+
+    ret = tsk_individual_table_init(&table, 0);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+
+    /* Add one row so that we can check takeset frees it */
+    ret_id = tsk_individual_table_add_row(&table, (tsk_flags_t) 1, test_location,
+        spatial_dimension, test_parents, num_parents, test_metadata,
+        test_metadata_length);
+    CU_ASSERT_EQUAL_FATAL(ret_id, 0);
+
+    ret = tsk_individual_table_takeset_columns(&table, num_rows, flags, location,
+        location_offset, parents, parents_offset, metadata, metadata_offset);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+    CU_ASSERT_TRUE(tsk_individual_table_equals(&source_table, &table, 0));
+
+    /* Test error states, all of these must not take the array, or free existing */
+    /* location and location offset must be simultaneously NULL or not */
+    ret = tsk_individual_table_takeset_columns(&table, num_rows, flags, location, NULL,
+        parents, parents_offset, metadata, metadata_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    ret = tsk_individual_table_takeset_columns(&table, num_rows, flags, NULL,
+        location_offset, NULL, NULL, metadata, metadata_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    /* parents and parents offset must be simultaneously NULL or not */
+    ret = tsk_individual_table_takeset_columns(&table, num_rows, flags, location,
+        location_offset, parents, NULL, metadata, metadata_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    ret = tsk_individual_table_takeset_columns(&table, num_rows, flags, location,
+        location_offset, NULL, parents_offset, metadata, metadata_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    /* metadata and metadata offset must be simultaneously NULL or not */
+    ret = tsk_individual_table_takeset_columns(&table, num_rows, flags, location,
+        location_offset, parents, parents_offset, NULL, metadata_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    ret = tsk_individual_table_takeset_columns(&table, num_rows, flags, location,
+        location_offset, parents, parents_offset, metadata, NULL);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+
+    /* Truncation after takeset keeps memory and max_rows */
+    ret = tsk_individual_table_clear(&table);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+    CU_ASSERT_EQUAL_FATAL(table.max_rows, num_rows);
+
+    /* if ragged array and offset are both null, all entries are zero length,
+       NULL flags mean all zero entries */
+    num_rows = 10;
+    ret = tsk_individual_table_takeset_columns(
+        &table, num_rows, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    CU_ASSERT_EQUAL(tsk_memcmp(table.flags, zeros, num_rows * sizeof(tsk_flags_t)), 0);
+    CU_ASSERT_EQUAL(ret, 0);
+    CU_ASSERT_EQUAL(table.num_rows, num_rows);
+    CU_ASSERT_EQUAL(
+        tsk_memcmp(table.location_offset, zeros, (num_rows + 1) * sizeof(tsk_size_t)),
+        0);
+    CU_ASSERT_EQUAL(table.location_length, 0);
+    CU_ASSERT_EQUAL(
+        tsk_memcmp(table.parents_offset, zeros, (num_rows + 1) * sizeof(tsk_size_t)), 0);
+    CU_ASSERT_EQUAL(table.parents_length, 0);
+    CU_ASSERT_EQUAL(
+        tsk_memcmp(table.metadata_offset, zeros, (num_rows + 1) * sizeof(tsk_size_t)),
+        0);
+    CU_ASSERT_EQUAL(table.metadata_length, 0);
+
+    ret = tsk_individual_table_free(&table);
+    CU_ASSERT_EQUAL(ret, 0);
+    ret = tsk_individual_table_free(&source_table);
+    CU_ASSERT_EQUAL(ret, 0);
+}
+
+static void
 test_individual_table_update_row(void)
 {
     int ret;
@@ -9235,6 +9372,7 @@ main(int argc, char **argv)
         { "test_migration_table", test_migration_table },
         { "test_migration_table_update_row", test_migration_table_update_row },
         { "test_individual_table", test_individual_table },
+        { "test_individual_table_takeset", test_individual_table_takeset },
         { "test_individual_table_update_row", test_individual_table_update_row },
         { "test_population_table", test_population_table },
         { "test_population_table_update_row", test_population_table_update_row },

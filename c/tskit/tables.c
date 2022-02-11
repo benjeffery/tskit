@@ -642,28 +642,38 @@ out:
 }
 
 static int
-takeset_ragged_column(tsk_size_t num_rows, void *data, tsk_size_t *offset,
-    void **data_dest, tsk_size_t **offset_dest)
+check_ragged_column(tsk_size_t num_rows, void *data, tsk_size_t *offset)
 {
     int ret = 0;
-
     if ((data == NULL) != (offset == NULL)) {
         ret = TSK_ERR_BAD_PARAM_VALUE;
         goto out;
     }
+    if (data != NULL) {
+        ret = check_offsets(num_rows, offset, 0, false);
+        if (ret != 0) {
+            goto out;
+        }
+    }
+out:
+    return ret;
+}
+
+static int
+takeset_ragged_column(tsk_size_t num_rows, void *data, tsk_size_t *offset,
+    void **data_dest, tsk_size_t **offset_dest, tsk_size_t *length_dest)
+{
+    int ret = 0;
     if (data == NULL) {
         ret = alloc_empty_ragged_column(num_rows, (void *) data_dest, offset_dest);
         if (ret != 0) {
             goto out;
         }
     } else {
-        ret = check_offsets(num_rows, offset, 0, false);
-        if (ret != 0) {
-            goto out;
-        }
         *data_dest = data;
         *offset_dest = offset;
     }
+    *length_dest = (*offset_dest)[num_rows];
 out:
     return ret;
 }
@@ -1070,6 +1080,20 @@ tsk_individual_table_takeset_columns(tsk_individual_table_t *self, tsk_size_t nu
 {
     int ret = 0;
 
+    /* We need to check all the inputs before we start freeing or taking memory */
+    ret = check_ragged_column(num_rows, location, location_offset);
+    if (ret != 0) {
+        goto out;
+    }
+    ret = check_ragged_column(num_rows, parents, parents_offset);
+    if (ret != 0) {
+        goto out;
+    }
+    ret = check_ragged_column(num_rows, metadata, metadata_offset);
+    if (ret != 0) {
+        goto out;
+    }
+
     tsk_individual_table_free_columns(self);
     self->num_rows = num_rows;
     self->max_rows = num_rows;
@@ -1087,17 +1111,17 @@ tsk_individual_table_takeset_columns(tsk_individual_table_t *self, tsk_size_t nu
     }
 
     ret = takeset_ragged_column(num_rows, location, location_offset,
-        (void *) &self->location, &self->location_offset);
+        (void *) &self->location, &self->location_offset, &self->location_length);
     if (ret != 0) {
         goto out;
     }
     ret = takeset_ragged_column(num_rows, parents, parents_offset,
-        (void *) &self->parents, &self->parents_offset);
+        (void *) &self->parents, &self->parents_offset, &self->parents_length);
     if (ret != 0) {
         goto out;
     }
     ret = takeset_ragged_column(num_rows, metadata, metadata_offset,
-        (void *) &self->metadata, &self->metadata_offset);
+        (void *) &self->metadata, &self->metadata_offset, &self->metadata_length);
     if (ret != 0) {
         goto out;
     }
@@ -1837,7 +1861,7 @@ tsk_node_table_takeset_columns(tsk_node_table_t *self, tsk_size_t num_rows,
         goto out;
     }
     ret = takeset_ragged_column(num_rows, metadata, metadata_offset,
-        (void *) &self->metadata, &self->metadata_offset);
+        (void *) &self->metadata, &self->metadata_offset, &self->metadata_length);
     if (ret != 0) {
         goto out;
     }
