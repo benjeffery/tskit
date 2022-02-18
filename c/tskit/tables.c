@@ -1835,41 +1835,6 @@ out:
 }
 
 int TSK_WARN_UNUSED
-tsk_node_table_takeset_columns(tsk_node_table_t *self, tsk_size_t num_rows,
-    tsk_flags_t *flags, double *time, tsk_id_t *population, tsk_id_t *individual,
-    char *metadata, tsk_size_t *metadata_offset)
-{
-    int ret;
-
-    tsk_node_table_free_columns(self);
-
-    /* Check the mandatory columns */
-    if (flags == NULL || time == NULL) {
-        /* TODO TSK_ERR_MANDATORY_COLUMN_MISSING */
-        ret = TSK_ERR_BAD_PARAM_VALUE;
-        goto out;
-    }
-    self->flags = flags;
-    self->time = time;
-
-    ret = takeset_optional_id_column(num_rows, population, &self->population);
-    if (ret != 0) {
-        goto out;
-    }
-    ret = takeset_optional_id_column(num_rows, individual, &self->individual);
-    if (ret != 0) {
-        goto out;
-    }
-    ret = takeset_ragged_column(num_rows, metadata, metadata_offset,
-        (void *) &self->metadata, &self->metadata_offset, &self->metadata_length);
-    if (ret != 0) {
-        goto out;
-    }
-out:
-    return ret;
-}
-
-int TSK_WARN_UNUSED
 tsk_node_table_set_columns(tsk_node_table_t *self, tsk_size_t num_rows,
     const tsk_flags_t *flags, const double *time, const tsk_id_t *population,
     const tsk_id_t *individual, const char *metadata, const tsk_size_t *metadata_offset)
@@ -1882,6 +1847,47 @@ tsk_node_table_set_columns(tsk_node_table_t *self, tsk_size_t num_rows,
     }
     ret = tsk_node_table_append_columns(
         self, num_rows, flags, time, population, individual, metadata, metadata_offset);
+out:
+    return ret;
+}
+
+int TSK_WARN_UNUSED
+tsk_node_table_takeset_columns(tsk_node_table_t *self, tsk_size_t num_rows,
+    tsk_flags_t *flags, double *time, tsk_id_t *population, tsk_id_t *individual,
+    char *metadata, tsk_size_t *metadata_offset)
+{
+    int ret = 0;
+
+    /* We need to check all the inputs before we start freeing or taking memory */
+    if (flags == NULL || time == NULL) {
+        ret = TSK_ERR_BAD_PARAM_VALUE;
+        goto out;
+    }
+    ret = check_ragged_column(num_rows, metadata, metadata_offset);
+    if (ret != 0) {
+        goto out;
+    }
+
+    tsk_node_table_free_columns(self);
+    self->num_rows = num_rows;
+    self->max_rows = num_rows;
+    self->flags = flags;
+    self->time = time;
+
+    ret = takeset_optional_id_column(num_rows, population, &self->population);
+    if (ret != 0) {
+        goto out;
+    }
+    ret = takeset_optional_id_column(num_rows, individual, &self->individual);
+    if (ret != 0) {
+        goto out;
+    }
+
+    ret = takeset_ragged_column(num_rows, metadata, metadata_offset,
+        (void *) &self->metadata, &self->metadata_offset, &self->metadata_length);
+    if (ret != 0) {
+        goto out;
+    }
 out:
     return ret;
 }
