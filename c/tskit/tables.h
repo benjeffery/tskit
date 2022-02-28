@@ -1708,6 +1708,10 @@ int tsk_edge_table_append_columns(tsk_edge_table_t *self, tsk_size_t num_rows,
     const double *left, const double *right, const tsk_id_t *parent,
     const tsk_id_t *child, const char *metadata, const tsk_size_t *metadata_offset);
 
+int tsk_edge_table_takeset_columns(tsk_edge_table_t *self, tsk_size_t num_rows,
+    double *left, double *right, tsk_id_t *parent, tsk_id_t *child, char *metadata,
+    tsk_size_t *metadata_offset);
+
 /**
 @brief Controls the pre-allocation strategy for this table
 

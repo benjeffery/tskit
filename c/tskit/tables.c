@@ -2338,6 +2338,25 @@ out:
  * edge table
  *************************/
 
+static void
+tsk_edge_table_free_columns(tsk_edge_table_t *self)
+{
+    tsk_safe_free(self->left);
+    tsk_safe_free(self->right);
+    tsk_safe_free(self->parent);
+    tsk_safe_free(self->child);
+    tsk_safe_free(self->metadata);
+    tsk_safe_free(self->metadata_offset);
+}
+
+int
+tsk_edge_table_free(tsk_edge_table_t *self)
+{
+    tsk_edge_table_free_columns(self);
+    tsk_safe_free(self->metadata_schema);
+    return 0;
+}
+
 static int
 tsk_edge_table_has_metadata(const tsk_edge_table_t *self)
 {
@@ -2611,6 +2630,40 @@ out:
     return ret;
 }
 
+int TSK_WARN_UNUSED
+tsk_edge_table_takeset_columns(tsk_edge_table_t *self, tsk_size_t num_rows, double *left,
+    double *right, tsk_id_t *parent, tsk_id_t *child, char *metadata,
+    tsk_size_t *metadata_offset)
+{
+    int ret = 0;
+
+    /* We need to check all the inputs before we start freeing or taking memory */
+    if (left == NULL || right == NULL || parent == NULL || child == NULL) {
+        ret = TSK_ERR_BAD_PARAM_VALUE;
+        goto out;
+    }
+    ret = check_ragged_column(num_rows, metadata, metadata_offset);
+    if (ret != 0) {
+        goto out;
+    }
+
+    tsk_edge_table_free_columns(self);
+    self->num_rows = num_rows;
+    self->max_rows = num_rows;
+    self->left = left;
+    self->right = right;
+    self->parent = parent;
+    self->child = child;
+
+    ret = takeset_ragged_column(num_rows, metadata, metadata_offset,
+        (void *) &self->metadata, &self->metadata_offset, &self->metadata_length);
+    if (ret != 0) {
+        goto out;
+    }
+out:
+    return ret;
+}
+
 int
 tsk_edge_table_append_columns(tsk_edge_table_t *self, tsk_size_t num_rows,
     const double *left, const double *right, const tsk_id_t *parent,
@@ -2730,19 +2783,6 @@ tsk_edge_table_extend(tsk_edge_table_t *self, const tsk_edge_table_t *other,
     ret = 0;
 out:
     return ret;
-}
-
-int
-tsk_edge_table_free(tsk_edge_table_t *self)
-{
-    tsk_safe_free(self->left);
-    tsk_safe_free(self->right);
-    tsk_safe_free(self->parent);
-    tsk_safe_free(self->child);
-    tsk_safe_free(self->metadata);
-    tsk_safe_free(self->metadata_offset);
-    tsk_safe_free(self->metadata_schema);
-    return 0;
 }
 
 static inline void
