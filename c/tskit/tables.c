@@ -3056,6 +3056,24 @@ out:
  * site table
  *************************/
 
+static void
+tsk_site_table_free_columns(tsk_site_table_t *self)
+{
+    tsk_safe_free(self->position);
+    tsk_safe_free(self->ancestral_state);
+    tsk_safe_free(self->ancestral_state_offset);
+    tsk_safe_free(self->metadata);
+    tsk_safe_free(self->metadata_offset);
+}
+
+int
+tsk_site_table_free(tsk_site_table_t *self)
+{
+    tsk_site_table_free_columns(self);
+    tsk_safe_free(self->metadata_schema);
+    return 0;
+}
+
 static int
 tsk_site_table_expand_main_columns(tsk_site_table_t *self, tsk_size_t additional_rows)
 {
@@ -3397,6 +3415,47 @@ out:
     return ret;
 }
 
+int
+tsk_site_table_takeset_columns(tsk_site_table_t *self, tsk_size_t num_rows,
+    double *position, char *ancestral_state, tsk_size_t *ancestral_state_offset,
+    char *metadata, tsk_size_t *metadata_offset)
+{
+    int ret = 0;
+
+    /* We need to check all the inputs before we start freeing or taking memory */
+    if (position == NULL || ancestral_state == NULL || ancestral_state_offset == NULL) {
+        ret = TSK_ERR_BAD_PARAM_VALUE;
+        goto out;
+    }
+    ret = check_ragged_column(num_rows, ancestral_state, ancestral_state_offset);
+    if (ret != 0) {
+        goto out;
+    }
+    ret = check_ragged_column(num_rows, metadata, metadata_offset);
+    if (ret != 0) {
+        goto out;
+    }
+
+    tsk_site_table_free_columns(self);
+    self->num_rows = num_rows;
+    self->max_rows = num_rows;
+    self->position = position;
+
+    ret = takeset_ragged_column(num_rows, ancestral_state, ancestral_state_offset,
+        (void *) &self->ancestral_state, &self->ancestral_state_offset,
+        &self->ancestral_state_length);
+    if (ret != 0) {
+        goto out;
+    }
+    ret = takeset_ragged_column(num_rows, metadata, metadata_offset,
+        (void *) &self->metadata, &self->metadata_offset, &self->metadata_length);
+    if (ret != 0) {
+        goto out;
+    }
+out:
+    return ret;
+}
+
 bool
 tsk_site_table_equals(
     const tsk_site_table_t *self, const tsk_site_table_t *other, tsk_flags_t options)
@@ -3485,18 +3544,6 @@ tsk_site_table_extend(tsk_site_table_t *self, const tsk_site_table_t *other,
     ret = 0;
 out:
     return ret;
-}
-
-int
-tsk_site_table_free(tsk_site_table_t *self)
-{
-    tsk_safe_free(self->position);
-    tsk_safe_free(self->ancestral_state);
-    tsk_safe_free(self->ancestral_state_offset);
-    tsk_safe_free(self->metadata);
-    tsk_safe_free(self->metadata_offset);
-    tsk_safe_free(self->metadata_schema);
-    return 0;
 }
 
 void

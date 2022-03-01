@@ -2339,6 +2339,10 @@ int tsk_site_table_append_columns(tsk_site_table_t *self, tsk_size_t num_rows,
     const tsk_size_t *ancestral_state_offset, const char *metadata,
     const tsk_size_t *metadata_offset);
 
+int tsk_site_table_takeset_columns(tsk_site_table_t *self, tsk_size_t num_rows,
+    double *position, char *ancestral_state, tsk_size_t *ancestral_state_offset,
+    char *metadata, tsk_size_t *metadata_offset);
+
 /**
 @brief Controls the pre-allocation strategy for this table
 
