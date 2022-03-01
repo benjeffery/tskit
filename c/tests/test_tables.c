@@ -5224,6 +5224,101 @@ test_provenance_table(void)
 }
 
 static void
+test_provenance_table_takeset(void)
+{
+    int ret = 0;
+    tsk_id_t ret_id;
+    tsk_provenance_table_t source_table, table;
+    tsk_size_t num_rows = 100;
+    tsk_id_t j;
+    char *timestamp;
+    tsk_size_t *timestamp_offset;
+    char *record;
+    tsk_size_t *record_offset;
+    const char *test_timestamp = "red";
+    tsk_size_t test_timestamp_length = 3;
+    const char *test_record = "test";
+    tsk_size_t test_record_length = 4;
+    tsk_size_t zeros[num_rows + 1];
+    tsk_id_t neg_ones[num_rows];
+
+    tsk_memset(zeros, 0, (num_rows + 1) * sizeof(tsk_size_t));
+    tsk_memset(neg_ones, 0xff, num_rows * sizeof(tsk_id_t));
+    /* Make a table to copy from */
+    ret = tsk_provenance_table_init(&source_table, 0);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+    for (j = 0; j < (tsk_id_t) num_rows; j++) {
+        ret_id = tsk_provenance_table_add_row(&source_table, test_timestamp,
+            test_timestamp_length, test_record, test_record_length);
+        CU_ASSERT_EQUAL_FATAL(ret_id, j);
+    }
+
+    /* Prepare arrays to be taken */
+    timestamp = tsk_malloc(num_rows * test_timestamp_length * sizeof(char));
+    CU_ASSERT_FATAL(timestamp != NULL);
+    tsk_memcpy(timestamp, source_table.timestamp,
+        num_rows * test_timestamp_length * sizeof(char));
+    timestamp_offset = tsk_malloc((num_rows + 1) * sizeof(tsk_size_t));
+    CU_ASSERT_FATAL(timestamp_offset != NULL);
+    tsk_memcpy(timestamp_offset, source_table.timestamp_offset,
+        (num_rows + 1) * sizeof(tsk_size_t));
+    record = tsk_malloc(num_rows * test_record_length * sizeof(char));
+    CU_ASSERT_FATAL(record != NULL);
+    tsk_memcpy(
+        record, source_table.record, num_rows * test_record_length * sizeof(char));
+    record_offset = tsk_malloc((num_rows + 1) * sizeof(tsk_size_t));
+    CU_ASSERT_FATAL(record_offset != NULL);
+    tsk_memcpy(
+        record_offset, source_table.record_offset, (num_rows + 1) * sizeof(tsk_size_t));
+
+    ret = tsk_provenance_table_init(&table, 0);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+
+    /* Add one row so that we can check takeset frees it */
+    ret_id = tsk_provenance_table_add_row(
+        &table, test_timestamp, test_timestamp_length, test_record, test_record_length);
+    CU_ASSERT_EQUAL_FATAL(ret_id, 0);
+
+    ret = tsk_provenance_table_takeset_columns(
+        &table, num_rows, timestamp, timestamp_offset, record, record_offset);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+    CU_ASSERT_TRUE(tsk_provenance_table_equals(&source_table, &table, 0));
+
+    /* Test error states, all of these must not take the array, or free existing */
+    ret = tsk_provenance_table_takeset_columns(
+        &table, num_rows, NULL, timestamp_offset, record, record_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    ret = tsk_provenance_table_takeset_columns(
+        &table, num_rows, timestamp, NULL, record, record_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    ret = tsk_provenance_table_takeset_columns(
+        &table, num_rows, timestamp, timestamp_offset, NULL, record_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    ret = tsk_provenance_table_takeset_columns(
+        &table, num_rows, timestamp, timestamp_offset, record, NULL);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+
+    /* Truncation after takeset keeps memory and max_rows */
+    ret = tsk_provenance_table_clear(&table);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+    CU_ASSERT_EQUAL_FATAL(table.max_rows, num_rows);
+
+    timestamp = tsk_malloc(num_rows * test_timestamp_length * sizeof(char));
+    CU_ASSERT_FATAL(timestamp != NULL);
+    tsk_memcpy(timestamp, source_table.timestamp,
+        num_rows * test_timestamp_length * sizeof(char));
+    timestamp_offset = tsk_malloc((num_rows + 1) * sizeof(tsk_size_t));
+    CU_ASSERT_FATAL(timestamp_offset != NULL);
+    tsk_memcpy(timestamp_offset, source_table.timestamp_offset,
+        (num_rows + 1) * sizeof(tsk_size_t));
+
+    ret = tsk_provenance_table_free(&table);
+    CU_ASSERT_EQUAL(ret, 0);
+    ret = tsk_provenance_table_free(&source_table);
+    CU_ASSERT_EQUAL(ret, 0);
+}
+
+static void
 test_provenance_table_update_row(void)
 {
     int ret;
@@ -9731,6 +9826,7 @@ main(int argc, char **argv)
         { "test_population_table_update_row", test_population_table_update_row },
         { "test_provenance_table", test_provenance_table },
         { "test_provenance_table_update_row", test_provenance_table_update_row },
+        { "test_provenance_table_takeset", test_provenance_table_takeset },
         { "test_table_size_increments", test_table_size_increments },
         { "test_table_expansion", test_table_expansion },
         { "test_ragged_expansion", test_ragged_expansion },

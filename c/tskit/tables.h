@@ -3274,6 +3274,10 @@ int tsk_provenance_table_append_columns(tsk_provenance_table_t *self,
     tsk_size_t num_rows, const char *timestamp, const tsk_size_t *timestamp_offset,
     const char *record, const tsk_size_t *record_offset);
 
+int tsk_provenance_table_takeset_columns(tsk_provenance_table_t *self,
+    tsk_size_t num_rows, char *timestamp, tsk_size_t *timestamp_offset, char *record,
+    tsk_size_t *record_offset);
+
 /**
 @brief Controls the pre-allocation strategy for this table
 

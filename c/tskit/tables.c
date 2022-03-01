@@ -5494,6 +5494,22 @@ out:
  * provenance table
  *************************/
 
+static void
+tsk_provenance_table_free_columns(tsk_provenance_table_t *self)
+{
+    tsk_safe_free(self->timestamp);
+    tsk_safe_free(self->timestamp_offset);
+    tsk_safe_free(self->record);
+    tsk_safe_free(self->record_offset);
+}
+
+int
+tsk_provenance_table_free(tsk_provenance_table_t *self)
+{
+    tsk_provenance_table_free_columns(self);
+    return 0;
+}
+
 static int
 tsk_provenance_table_expand_main_columns(
     tsk_provenance_table_t *self, tsk_size_t additional_rows)
@@ -5689,6 +5705,46 @@ out:
     return ret;
 }
 
+int
+tsk_provenance_table_takeset_columns(tsk_provenance_table_t *self, tsk_size_t num_rows,
+    char *timestamp, tsk_size_t *timestamp_offset, char *record,
+    tsk_size_t *record_offset)
+{
+    int ret = 0;
+
+    /* We need to check all the inputs before we start freeing or taking memory */
+    if (timestamp == NULL || timestamp_offset == NULL || record == NULL
+        || record_offset == NULL) {
+        ret = TSK_ERR_BAD_PARAM_VALUE;
+        goto out;
+    }
+    ret = check_ragged_column(num_rows, timestamp, timestamp_offset);
+    if (ret != 0) {
+        goto out;
+    }
+    ret = check_ragged_column(num_rows, record, record_offset);
+    if (ret != 0) {
+        goto out;
+    }
+
+    tsk_provenance_table_free_columns(self);
+    self->num_rows = num_rows;
+    self->max_rows = num_rows;
+
+    ret = takeset_ragged_column(num_rows, timestamp, timestamp_offset,
+        (void *) &self->timestamp, &self->timestamp_offset, &self->timestamp_length);
+    if (ret != 0) {
+        goto out;
+    }
+    ret = takeset_ragged_column(num_rows, record, record_offset, (void *) &self->record,
+        &self->record_offset, &self->record_length);
+    if (ret != 0) {
+        goto out;
+    }
+out:
+    return ret;
+}
+
 static tsk_id_t
 tsk_provenance_table_add_row_internal(tsk_provenance_table_t *self,
     const char *timestamp, tsk_size_t timestamp_length, const char *record,
@@ -5869,16 +5925,6 @@ tsk_provenance_table_extend(tsk_provenance_table_t *self,
     ret = 0;
 out:
     return ret;
-}
-
-int
-tsk_provenance_table_free(tsk_provenance_table_t *self)
-{
-    tsk_safe_free(self->timestamp);
-    tsk_safe_free(self->timestamp_offset);
-    tsk_safe_free(self->record);
-    tsk_safe_free(self->record_offset);
-    return 0;
 }
 
 void
