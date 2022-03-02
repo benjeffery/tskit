@@ -2683,6 +2683,10 @@ int tsk_mutation_table_append_columns(tsk_mutation_table_t *self, tsk_size_t num
     const tsk_size_t *derived_state_offset, const char *metadata,
     const tsk_size_t *metadata_offset);
 
+int tsk_mutation_table_takeset_columns(tsk_mutation_table_t *self, tsk_size_t num_rows,
+    tsk_id_t *site, tsk_id_t *node, tsk_id_t *parent, double *time, char *derived_state,
+    tsk_size_t *derived_state_offset, char *metadata, tsk_size_t *metadata_offset);
+
 /**
 @brief Controls the pre-allocation strategy for this table
 

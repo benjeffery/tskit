@@ -3344,6 +3344,135 @@ test_mutation_table(void)
 }
 
 static void
+test_mutation_table_takeset(void)
+{
+    int ret = 0;
+    tsk_id_t ret_id;
+    tsk_mutation_table_t source_table, table;
+    tsk_size_t num_rows = 100;
+    tsk_id_t j;
+    tsk_id_t *site;
+    tsk_id_t *node;
+    tsk_id_t *parent;
+    double *time;
+    char *derived_state;
+    tsk_size_t *derived_state_offset;
+    char *metadata;
+    tsk_size_t *metadata_offset;
+    const char *test_derived_state = "red";
+    tsk_size_t test_derived_state_length = 3;
+    const char *test_metadata = "test";
+    tsk_size_t test_metadata_length = 4;
+    tsk_size_t zeros[num_rows + 1];
+    tsk_id_t neg_ones[num_rows];
+
+    tsk_memset(zeros, 0, (num_rows + 1) * sizeof(tsk_size_t));
+    tsk_memset(neg_ones, 0xff, num_rows * sizeof(tsk_id_t));
+    /* Make a table to copy from */
+    ret = tsk_mutation_table_init(&source_table, 0);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+    for (j = 0; j < (tsk_id_t) num_rows; j++) {
+        ret_id = tsk_mutation_table_add_row(&source_table, j, j + 1, j + 2, j + 3,
+            test_derived_state, test_derived_state_length, test_metadata,
+            test_metadata_length);
+        CU_ASSERT_EQUAL_FATAL(ret_id, j);
+    }
+
+    /* Prepare arrays to be taken */
+    site = tsk_malloc(num_rows * sizeof(tsk_id_t));
+    CU_ASSERT_FATAL(site != NULL);
+    tsk_memcpy(site, source_table.site, num_rows * sizeof(tsk_id_t));
+    node = tsk_malloc(num_rows * sizeof(tsk_id_t));
+    CU_ASSERT_FATAL(node != NULL);
+    tsk_memcpy(node, source_table.node, num_rows * sizeof(tsk_id_t));
+    derived_state = tsk_malloc(num_rows * test_derived_state_length * sizeof(char));
+    parent = tsk_malloc(num_rows * sizeof(tsk_id_t));
+    CU_ASSERT_FATAL(parent != NULL);
+    tsk_memcpy(parent, source_table.parent, num_rows * sizeof(tsk_id_t));
+    time = tsk_malloc(num_rows * sizeof(double));
+    CU_ASSERT_FATAL(time != NULL);
+    tsk_memcpy(time, source_table.time, num_rows * sizeof(double));
+    CU_ASSERT_FATAL(derived_state != NULL);
+    tsk_memcpy(derived_state, source_table.derived_state,
+        num_rows * test_derived_state_length * sizeof(char));
+    derived_state_offset = tsk_malloc((num_rows + 1) * sizeof(tsk_size_t));
+    CU_ASSERT_FATAL(derived_state_offset != NULL);
+    tsk_memcpy(derived_state_offset, source_table.derived_state_offset,
+        (num_rows + 1) * sizeof(tsk_size_t));
+    metadata = tsk_malloc(num_rows * test_metadata_length * sizeof(char));
+    CU_ASSERT_FATAL(metadata != NULL);
+    tsk_memcpy(
+        metadata, source_table.metadata, num_rows * test_metadata_length * sizeof(char));
+    metadata_offset = tsk_malloc((num_rows + 1) * sizeof(tsk_size_t));
+    CU_ASSERT_FATAL(metadata_offset != NULL);
+    tsk_memcpy(metadata_offset, source_table.metadata_offset,
+        (num_rows + 1) * sizeof(tsk_size_t));
+
+    ret = tsk_mutation_table_init(&table, 0);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+
+    /* Add one row so that we can check takeset frees it */
+    ret_id = tsk_mutation_table_add_row(&table, 1, 1, 1, 1, test_derived_state,
+        test_derived_state_length, test_metadata, test_metadata_length);
+    CU_ASSERT_EQUAL_FATAL(ret_id, 0);
+
+    ret = tsk_mutation_table_takeset_columns(&table, num_rows, site, node, parent, time,
+        derived_state, derived_state_offset, metadata, metadata_offset);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+    CU_ASSERT_TRUE(tsk_mutation_table_equals(&source_table, &table, 0));
+
+    /* Test error states, all of these must not take the array, or free existing */
+    /* metadata and metadata offset must be simultaneously NULL or not */
+    ret = tsk_mutation_table_takeset_columns(&table, num_rows, NULL, derived_state,
+        derived_state_offset, metadata, metadata_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    ret = tsk_mutation_table_takeset_columns(&table, num_rows, site, node, parent, time,
+        NULL, derived_state_offset, metadata, metadata_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    ret = tsk_mutation_table_takeset_columns(&table, num_rows, site, node, parent, time,
+        derived_state, NULL, metadata, metadata_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    ret = tsk_mutation_table_takeset_columns(&table, num_rows, site, node, parent, time,
+        derived_state, derived_state_offset, NULL, metadata_offset);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+    ret = tsk_mutation_table_takeset_columns(&table, num_rows, site, node, parent, time,
+        derived_state, derived_state_offset, metadata, NULL);
+    CU_ASSERT_EQUAL(ret, TSK_ERR_BAD_PARAM_VALUE);
+
+    /* Truncation after takeset keeps memory and max_rows */
+    ret = tsk_mutation_table_clear(&table);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+    CU_ASSERT_EQUAL_FATAL(table.max_rows, num_rows);
+
+    position = tsk_malloc(num_rows * sizeof(double));
+    CU_ASSERT_FATAL(position != NULL);
+    tsk_memcpy(position, source_table.position, num_rows * sizeof(double));
+    derived_state = tsk_malloc(num_rows * test_derived_state_length * sizeof(char));
+    CU_ASSERT_FATAL(derived_state != NULL);
+    tsk_memcpy(derived_state, source_table.derived_state,
+        num_rows * test_derived_state_length * sizeof(char));
+    derived_state_offset = tsk_malloc((num_rows + 1) * sizeof(tsk_size_t));
+    CU_ASSERT_FATAL(derived_state_offset != NULL);
+    tsk_memcpy(derived_state_offset, source_table.derived_state_offset,
+        (num_rows + 1) * sizeof(tsk_size_t));
+    /* if metadata and offset are both null, all entries are zero length*/
+    num_rows = 10;
+    ret = tsk_mutation_table_takeset_columns(&table, num_rows, site, node, parent, time,
+        derived_state, derived_state_offset, NULL, NULL);
+    CU_ASSERT_EQUAL(ret, 0);
+    CU_ASSERT_EQUAL(table.num_rows, num_rows);
+    CU_ASSERT_EQUAL(
+        tsk_memcmp(table.metadata_offset, zeros, (num_rows + 1) * sizeof(tsk_size_t)),
+        0);
+    CU_ASSERT_EQUAL(table.metadata_length, 0);
+
+    ret = tsk_mutation_table_free(&table);
+    CU_ASSERT_EQUAL(ret, 0);
+    ret = tsk_mutation_table_free(&source_table);
+    CU_ASSERT_EQUAL(ret, 0);
+}
+
+static void
 test_mutation_table_update_row(void)
 {
     int ret;
@@ -9802,8 +9931,6 @@ main(int argc, char **argv)
         { "test_edge_table_update_row_no_metadata",
             test_edge_table_update_row_no_metadata },
         { "test_edge_table_takeset", test_edge_table_takeset },
-        // { "test_edge_table_takeset_no_metadata", test_edge_table_takeset_no_metadata
-        // },
         { "test_edge_table_copy_semantics", test_edge_table_copy_semantics },
         { "test_edge_table_squash", test_edge_table_squash },
         { "test_edge_table_squash_multiple_parents",
