@@ -874,7 +874,7 @@ test_single_tree_silent_mutations(void)
 }
 
 static void
-test_multiple_tree_get_variant(void)
+test_multiple_variant_decode(void)
 {
     int ret = 0;
     tsk_size_t k;
@@ -882,7 +882,6 @@ test_multiple_tree_get_variant(void)
     tsk_treeseq_t ts;
     tsk_variant_t var;
     tsk_variant_t var_subset;
-    tsk_site_t site;
     tsk_id_t samples[] = { 0, 1, 3 };
     int32_t genos[12];
     int32_t genos_expected[] = { 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1 };
@@ -897,9 +896,7 @@ test_multiple_tree_get_variant(void)
     CU_ASSERT_EQUAL_FATAL(ret, 0);
 
     for (s = 0; (tsk_size_t) s < tsk_treeseq_get_num_sites(&ts); s++) {
-        ret = tsk_treeseq_get_site(&ts, s, &site);
-        CU_ASSERT_EQUAL_FATAL(ret, 0);
-        ret = tsk_variant_decode(&var_subset, &site, 0);
+        ret = tsk_variant_decode(&var_subset, s, 0);
         CU_ASSERT_EQUAL_FATAL(ret, 0);
         for (k = 0; k < 3; ++k) {
             genos_subset[k + ((tsk_size_t) s * 3)] = var_subset.genotypes[k];
@@ -915,14 +912,12 @@ test_multiple_tree_get_variant(void)
     CU_ASSERT_EQUAL_FATAL(ret, 0);
 
     for (s = 0; (tsk_size_t) s < tsk_treeseq_get_num_sites(&ts); s++) {
-        ret = tsk_treeseq_get_site(&ts, s, &site);
-        CU_ASSERT_EQUAL_FATAL(ret, 0);
-        ret = tsk_variant_decode(&var, &site, 0);
+        ret = tsk_variant_decode(&var, s, 0);
         CU_ASSERT_EQUAL_FATAL(ret, 0);
         for (k = 0; k < 4; ++k) {
             genos[k + ((tsk_size_t) s * 4)] = var.genotypes[k];
         }
-        ret = tsk_variant_decode(&var_subset, &site, 0);
+        ret = tsk_variant_decode(&var_subset, s, 0);
         CU_ASSERT_EQUAL_FATAL(ret, 0);
         for (k = 0; k < 3; ++k) {
             genos_subset[k + ((tsk_size_t) s * 3)] = var_subset.genotypes[k];
@@ -938,7 +933,7 @@ test_multiple_tree_get_variant(void)
 }
 
 static void
-test_tree_get_variant_errors(void)
+test_variant_decode_errors(void)
 {
     int ret = 0;
     tsk_treeseq_t ts;
@@ -951,6 +946,13 @@ test_tree_get_variant_errors(void)
     /* Bad samples */
     ret = tsk_variant_init(&var, &ts, bad_samples, 3, NULL, 0);
     CU_ASSERT_EQUAL_FATAL(ret, TSK_ERR_OUT_OF_BOUNDS);
+    tsk_variant_free(&var);
+
+    /* Site out of bounds */
+    ret = tsk_variant_init(&var, &ts, NULL, 0, NULL, 0);
+    CU_ASSERT_EQUAL_FATAL(ret, 0);
+    ret = tsk_variant_decode(&var, 42, 0);
+    CU_ASSERT_EQUAL_FATAL(ret, TSK_ERR_SITE_OUT_OF_BOUNDS);
     tsk_variant_free(&var);
 
     tsk_treeseq_free(&ts);
@@ -975,8 +977,8 @@ main(int argc, char **argv)
         { "test_single_tree_subsample", test_single_tree_subsample },
         { "test_single_tree_many_alleles", test_single_tree_many_alleles },
         { "test_single_tree_silent_mutations", test_single_tree_silent_mutations },
-        { "test_multiple_tree_get_variant", test_multiple_tree_get_variant },
-        { "test_tree_get_variant_errors", test_tree_get_variant_errors },
+        { "test_multiple_variant_decode", test_multiple_variant_decode },
+        { "test_variant_decode_errors", test_variant_decode_errors },
         { NULL, NULL },
     };
 
