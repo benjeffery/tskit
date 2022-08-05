@@ -28,6 +28,6 @@ if __name__ == "__main__":
         ]
         for v in tqdm.tqdm(versions):
             sh(f"_bench-temp-venv/bin/pip install tskit=={v}")
-            sh("_bench-temp-venv/bin/python run.py")
+            sh("_bench-temp-venv/bin/python run.py --mem")
     finally:
         sh("rm -rf _bench-temp-venv")
