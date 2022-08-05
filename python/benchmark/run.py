@@ -7,8 +7,8 @@ import sys
 import tempfile
 import timeit
 from pathlib import Path
-import click
 
+import click
 import psutil
 import tqdm
 import yaml
@@ -83,18 +83,26 @@ def autotime(setup, code, quick):
     except Exception as e:
         print(f"{code}: Error running benchmark: {e}")
         return None
-    num_trials = int(max(1, (.2 if quick else 2) / one_run))
+    num_trials = int(max(1, (0.2 if quick else 2) / one_run))
     return one_run, num_trials, t.timeit(number=num_trials) / num_trials
+
 
 def benchmark_memory(setup, code):
     with tempfile.TemporaryDirectory() as tmpdir:
         code_file = os.path.join(tmpdir, "tmp.py")
         with open(code_file, "w") as f:
             f.write(f"{setup}\n{code}")
-#        f"valgrind --tool=massif --pages-as-heap=yes --massif-out-file=massif.out "
-#        f"python {code_file};
+        #        f"valgrind --tool=massif --pages-as-heap=yes --massif-out-file=massif.out "
+        #        f"python {code_file};
         proc = subprocess.Popen(
-            ["valgrind", "--tool=massif", "--pages-as-heap=yes", "--massif-out-file=massif.out", "python", code_file],
+            [
+                "valgrind",
+                "--tool=massif",
+                "--pages-as-heap=yes",
+                "--massif-out-file=massif.out",
+                "python",
+                code_file,
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -158,7 +166,7 @@ def run_benchmarks(cpu, mem, quick):
                     results[bench_name][code]["num_trials"] = num_trials
                     results[bench_name][code]["avg"] = avg
             if mem:
-                #First measure the memory usage of the setup
+                # First measure the memory usage of the setup
                 try:
                     setup_memory = setup_memory_results[setup]
                 except KeyError:
@@ -211,21 +219,24 @@ def generate_report(all_versions_results):
                     last_avg = None
                     for version in all_versions:
                         try:
-                            avg = all_versions_results[version]["tskit_benchmarks"] \
-                                [benchmark][code][key]
+                            avg = all_versions_results[version]["tskit_benchmarks"][
+                                benchmark
+                            ][code][key]
                             if last_avg is not None:
                                 if last_avg != 0:
                                     percent_change = 100 * ((avg - last_avg) / last_avg)
-                                    col = cmap(int(((percent_change / 100) * 128) + 128))
+                                    col = cmap(
+                                        int(((percent_change / 100) * 128) + 128)
+                                    )
                                 else:
                                     percent_change = None
                                     col = (1, 1, 1)
                                 # There is some jitter in the memory results so
                                 # don't colour if we're below a small change
-                                if key == "mem" and math.fabs(avg-last_avg) < 9000:
+                                if key == "mem" and math.fabs(avg - last_avg) < 9000:
                                     percent_change = None
                                     col = (1, 1, 1)
-                                #For memory benchmarks we get jitter
+                                # For memory benchmarks we get jitter
                                 f.write(
                                     f"<td style='background-color: rgba({col[0]*255},"
                                     f" {col[1]*255}, {col[2]*255}, 1)'>"
@@ -246,12 +257,19 @@ def generate_report(all_versions_results):
 
 import click
 
-@click.command()
-@click.option('--no-cpu', default=False, is_flag=True, help="Don't run cpu benchmarks")
-@click.option('--mem', default=False, is_flag=True, help='Run memory benchmarks')
-@click.option('--quick', default=False, is_flag=True, help='Run quick cpu benchmarks that are less accurate')
-@click.option('--report-only', default=False, is_flag=True, help='Only generate the HTML report')
 
+@click.command()
+@click.option("--no-cpu", default=False, is_flag=True, help="Don't run cpu benchmarks")
+@click.option("--mem", default=False, is_flag=True, help="Run memory benchmarks")
+@click.option(
+    "--quick",
+    default=False,
+    is_flag=True,
+    help="Run quick cpu benchmarks that are less accurate",
+)
+@click.option(
+    "--report-only", default=False, is_flag=True, help="Only generate the HTML report"
+)
 def benchmark(no_cpu, mem, quick, report_only):
     all_versions_results = {}
     results_json = tskit_dir / "benchmark" / "bench-results.json"
@@ -271,5 +289,7 @@ def benchmark(no_cpu, mem, quick, report_only):
 
     generate_report(all_versions_results)
     sys.exit(0)
-if __name__ == '__main__':
+
+
+if __name__ == "__main__":
     benchmark()
