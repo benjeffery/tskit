@@ -38,6 +38,7 @@ def ibd_segments(
     compare_lib=True,
     print_c=False,
     print_py=False,
+    squash=False
 ):
     """
     Calculates IBD segments using Python and converts output to lists of segments.
@@ -46,7 +47,7 @@ def ibd_segments(
     ibd_f = ibd.IbdFinder(
         ts, within=within, between=between, max_time=max_time, min_span=min_span
     )
-    ibd_segs = ibd_f.run()
+    ibd_segs = ibd_f.run(squash=squash)
     if print_py:
         print("Python output:\n")
         print(ibd_segs)
@@ -581,6 +582,11 @@ class TestIbdDifferentPaths:
         true_segs = {(0, 1): [tskit.IdentitySegment(0.2, 0.7, 4)]}
         assert_ibd_equal(ibd_segs, true_segs)
 
+    def test_squash(self):
+        ibd_segments(
+            self.ts(), within=[0, 1], squash=True, compare_lib=False, print_py=True
+        )
+
 
 class TestIbdDifferentPaths2:
     #
@@ -632,6 +638,11 @@ class TestIbdDifferentPaths2:
         }
         assert_ibd_equal(ibd_segs, true_segs)
 
+    def test_squash(self):
+        ibd_segments(
+            self.ts(), within=[1, 2], squash=True, compare_lib=False, print_py=True
+        )
+
 
 class TestIbdDifferentPaths3:
     # 2.00┊   4   ┊   4   ┊
@@ -662,6 +673,16 @@ class TestIbdDifferentPaths3:
             (0, 1): [tskit.IdentitySegment(0, 5, 4), tskit.IdentitySegment(5, 10, 4)],
         }
         assert_ibd_equal(ibd_segs, true_segs)
+
+    def test_squash(self):
+        ibd_segments(
+            self.ts(),
+            within=[0, 1],
+            squash=True,
+            compare_lib=False,
+            print_py=True,
+            print_c=True,
+        )
 
 
 class TestIbdPolytomies:
