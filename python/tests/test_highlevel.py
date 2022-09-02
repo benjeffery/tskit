@@ -208,18 +208,13 @@ def insert_gap(ts, position, length):
 
 
 @functools.lru_cache()
-def get_gap_examples(custom_max=None):
+def get_gap_examples():
     """
     Returns example tree sequences that contain gaps within the list of
     edges.
     """
     ret = []
-    if custom_max is None:
-        n_list = [20, 10]
-    else:
-        n_list = [custom_max, custom_max // 2]
-
-    ts = msprime.simulate(n_list[0], random_seed=56, recombination_rate=1)
+    ts = msprime.simulate(15, random_seed=56, recombination_rate=1)
 
     assert ts.num_trees > 1
 
@@ -235,7 +230,7 @@ def get_gap_examples(custom_max=None):
         assert found
         ret.append((f"gap {x}", ts))
     # Give an example with a gap at the end.
-    ts = msprime.simulate(n_list[1], random_seed=5, recombination_rate=1)
+    ts = msprime.simulate(7, random_seed=5, recombination_rate=1)
     tables = get_table_collection_copy(ts.dump_tables(), 2)
     tables.sites.clear()
     tables.mutations.clear()
@@ -276,24 +271,20 @@ def get_internal_samples_examples():
 
 
 @functools.lru_cache()
-def get_decapitated_examples(custom_max=None):
+def get_decapitated_examples():
     """
     Returns example tree sequences in which the oldest edges have been removed.
     """
     ret = []
-    if custom_max is None:
-        n_list = [10, 20]
-    else:
-        n_list = [custom_max // 2, custom_max]
-    ts = msprime.simulate(n_list[0], random_seed=1234)
-    # yield ts.decapitate(ts.tables.nodes.time[-1] / 2)
-    ts = msprime.simulate(n_list[1], recombination_rate=1, random_seed=1234)
+    ts = msprime.simulate(7, random_seed=1234)
+    ret.append(("decapitate", ts.decapitate(ts.tables.nodes.time[-1] / 2)))
+    ts = msprime.simulate(15, recombination_rate=1, random_seed=1234)
     assert ts.num_trees > 2
     ret.append(("decapitate recomb", ts.decapitate(ts.tables.nodes.time[-1] / 4)))
     return ret
 
 
-def get_bottleneck_examples(custom_max=None):
+def get_bottleneck_examples():
     """
     Returns an iterator of example tree sequences with nonbinary trees.
     """
@@ -302,11 +293,7 @@ def get_bottleneck_examples(custom_max=None):
         msprime.SimpleBottleneck(0.02, 0, proportion=0.25),
         msprime.SimpleBottleneck(0.03, 0, proportion=1),
     ]
-    if custom_max is None:
-        n_list = [3, 10, 100]
-    else:
-        n_list = [i * custom_max // 3 for i in range(1, 4)]
-    for n in n_list:
+    for n in [5, 10, 15]:
         ts = msprime.simulate(
             n,
             length=100,
@@ -328,16 +315,12 @@ def get_back_mutation_examples():
         yield tsutil.insert_branch_mutations(ts)
 
 
-def make_example_tree_sequences(custom_max=None):
-    yield from get_decapitated_examples(custom_max=custom_max)
-    yield from get_gap_examples(custom_max=custom_max)
+def make_example_tree_sequences():
+    yield from get_decapitated_examples()
+    yield from get_gap_examples()
     yield from get_internal_samples_examples()
     seed = 1
-    if custom_max is None:
-        n_list = [2, 3, 10, 100]
-    else:
-        n_list = [i * custom_max // 4 for i in range(1, 5)]
-    for n in n_list:
+    for n in [3, 7, 11, 15]:
         for m in [1, 2, 32]:
             for rho in [0, 0.1, 0.5]:
                 recomb_map = msprime.RecombinationMap.uniform_map(m, rho, num_loci=m)
@@ -357,7 +340,7 @@ def make_example_tree_sequences(custom_max=None):
                     tsutil.add_random_metadata(ts, seed=seed),
                 )
                 seed += 1
-    for name, ts in get_bottleneck_examples(custom_max=custom_max):
+    for name, ts in get_bottleneck_examples():
         yield (
             f"{name} mutated",
             msprime.mutate(
@@ -394,10 +377,10 @@ def make_example_tree_sequences(custom_max=None):
     yield ("all_fields", tsutil.all_fields_ts())
 
 
-_examples = tuple(make_example_tree_sequences(custom_max=None))
+_examples = tuple(make_example_tree_sequences())
 
 
-def get_example_tree_sequences(pytest_params=True, custom_max=None):
+def get_example_tree_sequences(pytest_params=True):
     if pytest_params:
         return [pytest.param(ts, id=name) for name, ts in _examples]
     else:
