@@ -73,6 +73,7 @@ deref_meta_schema["required"] = ["codec"]
 # For interoperability reasons, force the top-level to be an object or union
 # of object and null
 deref_meta_schema["properties"]["type"] = {"enum": ["object", ["object", "null"]]}
+deref_meta_schema["$schema"] = "http://json-schema.org/draft-07/schema#tskit"
 TSKITMetadataSchemaValidator.META_SCHEMA = deref_meta_schema
 
 
