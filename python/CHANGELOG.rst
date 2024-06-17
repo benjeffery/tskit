@@ -1,13 +1,6 @@
 --------------------
-[0.5.7] - 2023-XX-XX
+[0.5.8] - 2024-XX-XX
 --------------------
-
-**Breaking Changes**
-
-- The VCF writing methods (`ts.write_vcf`, `ts.as_vcf`) now error if a site with
-  position zero is encountered. The VCF spec does not allow zero position sites.
-  Suppress this error with the `allow_position_zero` argument.
-  (:user:`benjeffery`, :pr:`2901`, :issue:`2838`)
 
 **Features**
 
@@ -18,13 +11,24 @@
 - Add ``Table.drop_metadata`` to make clearing metadata from tables easy.
   (:user:`jeromekelleher`, :pr:`2944`)
 
+--------------------
+[0.5.7] - 2024-06-17
+--------------------
+
+**Breaking Changes**
+
+- The VCF writing methods (`ts.write_vcf`, `ts.as_vcf`) now error if a site with
+  position zero is encountered. The VCF spec does not allow zero position sites.
+  Suppress this error with the `allow_position_zero` argument.
+  (:user:`benjeffery`, :pr:`2901`, :issue:`2838`)
+
 **Bugfixes**
 
 - Fix to the folded, expected allele frequency spectrum (i.e.,
   `TreeSequence.allele_frequency_spectrum(mode="branch", polarised=False)`,
   which was half as big as it should have been. (:user:`petrelharp`,
   :user:`nspope`, :pr:`2933`)
-  
+
 --------------------
 [0.5.6] - 2023-10-10
 --------------------
