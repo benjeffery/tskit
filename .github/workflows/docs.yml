@@ -1,67 +1,15 @@
 name: Build Docs
-
 on:
   pull_request:
   push:
     branches: [main]
     tags:
       - '*'
-
-env:
-  COMMIT_EMAIL: ben.jeffery.well+adminbot@gmail.com
-  DOXYGEN: true
-  MAKE_TARGET: -C python
-  OWNER: tskit-dev
-  REPO: tskit
-  REQUIREMENTS: python/requirements/CI-docs/requirements.txt
-  APTGET: doxygen
-
+  merge_group:
 jobs:
-  build-deploy-docs:
-    name: Docs
-    runs-on: ubuntu-18.04
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
-      - uses: actions/checkout@v2
-        with:
-            submodules: true
-
-      - uses: actions/setup-python@v2
-        with:
-          python-version: 3.8
-
-      - uses: actions/cache@v2
-        id: cache
-        with:
-          path: venv
-          key: docs-venv-v2-${{ hashFiles(env.REQUIREMENTS) }}
-
-      - name: Build virtualenv
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: python -m venv venv
-
-      - name: Install deps
-        run: venv/bin/activate && pip install -r ${{env.REQUIREMENTS}}
-
-      - name: Install apt deps
-        if: env.APTGET
-        run: sudo apt-get install -y ${{env.APTGET}}
-
-      - name: Build C module
-        if: env.MAKE_TARGET
-        run: venv/bin/activate && make $MAKE_TARGET
-
-      - name: Build Docs
-        run: venv/bin/activate && make -C docs
-
-      - name: Trigger docs site rebuild
-        if: github.ref == 'refs/heads/main'
-        run: |
-          curl -X POST https://api.github.com/repos/tskit-dev/tskit-site/dispatches \
-                    -H 'Accept: application/vnd.github.everest-preview+json' \
-                    -u AdminBot-tskit:${{ secrets.ADMINBOT_TOKEN }} \
-                    --data '{"event_type":"build-docs"}'
+  Docs:
+    uses: tskit-dev/.github/.github/workflows/docs-build-template.yml@main
+    with:
+      requirements-path: python/requirements/CI-docs/requirements.txt
+      additional-setup: sudo apt-get install -y doxygen
+      make-command: make -C python
