@@ -118,7 +118,7 @@ dev = [
     "xmlunittest",
     "newick",
     "zarr<3",
-    "jupyter-book",
+    "jupyter-book<2",
     "breathe",
     "sphinx-autodoc-typehints",
     "sphinx-issues",

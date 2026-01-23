@@ -16,7 +16,7 @@ dependencies:
   - mypy
   - pre-commit
   - sphinx>=4.4
-  - jupyter-book
+  - jupyter-book<2
   - networkx
   - matplotlib
   - jsonschema
