@@ -34,6 +34,7 @@
 
 #define UUID_NUM_BYTES              16
 #define TSK_JSON_BINARY_HEADER_SIZE 21
+#define TSK_JSON_BINARY_ALIGNMENT   8
 
 static const uint8_t _tsk_json_binary_magic[4] = { 'J', 'B', 'L', 'B' };
 
@@ -150,6 +151,7 @@ tsk_json_struct_metadata_get_blob(const char *metadata, tsk_size_t metadata_leng
     uint8_t version;
     uint64_t json_length_u64;
     uint64_t binary_length_u64;
+    uint64_t aligned_offset;
     uint64_t header_and_json_length;
     uint64_t total_length;
     const uint8_t *bytes;
@@ -182,17 +184,24 @@ tsk_json_struct_metadata_get_blob(const char *metadata, tsk_size_t metadata_leng
         goto out;
     }
     header_and_json_length = (uint64_t) TSK_JSON_BINARY_HEADER_SIZE + json_length_u64;
-    if (binary_length_u64 > UINT64_MAX - header_and_json_length) {
+    if (header_and_json_length > UINT64_MAX - (uint64_t) (TSK_JSON_BINARY_ALIGNMENT - 1)) {
         ret = tsk_trace_error(TSK_ERR_JSON_STRUCT_METADATA_INVALID_LENGTH);
         goto out;
     }
-    total_length = header_and_json_length + binary_length_u64;
+    aligned_offset
+        = (header_and_json_length + (uint64_t) (TSK_JSON_BINARY_ALIGNMENT - 1))
+        & (uint64_t) ~(TSK_JSON_BINARY_ALIGNMENT - 1);
+    if (binary_length_u64 > UINT64_MAX - aligned_offset) {
+        ret = tsk_trace_error(TSK_ERR_JSON_STRUCT_METADATA_INVALID_LENGTH);
+        goto out;
+    }
+    total_length = aligned_offset + binary_length_u64;
     if ((uint64_t) metadata_length < total_length) {
         ret = tsk_trace_error(TSK_ERR_JSON_STRUCT_METADATA_TRUNCATED);
         goto out;
     }
     json_start = (const char *) bytes + TSK_JSON_BINARY_HEADER_SIZE;
-    blob_start = (const char *) bytes + TSK_JSON_BINARY_HEADER_SIZE + json_length_u64;
+    blob_start = (const char *) bytes + aligned_offset;
     *json = json_start;
     *json_length = (tsk_size_t) json_length_u64;
     *blob = blob_start;

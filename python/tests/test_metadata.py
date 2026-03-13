@@ -671,6 +671,32 @@ class TestJSONStructCodec:
         out = ms.decode_row(encoded)
         assert out == row
 
+    def test_blob_starts_on_8byte_boundary(self):
+        schema = {
+            "codec": "json+struct",
+            "json": {
+                "type": "object",
+                "properties": {"label": {"type": "string"}},
+            },
+            "struct": {
+                "type": "object",
+                "properties": {"blob": {"type": "integer", "binaryFormat": "i"}},
+            },
+        }
+        ms = tskit.MetadataSchema(schema)
+        encoded = ms.validate_and_encode_row({"label": "alpha", "blob": 5})
+        _, _, jlen, blen = metadata.JSONStructCodec._HDR.unpack_from(encoded)
+        json_end = metadata.JSONStructCodec._HDR.size + jlen
+        blob_start = (
+            (json_end + metadata.JSONStructCodec.BLOB_ALIGNMENT - 1)
+            // metadata.JSONStructCodec.BLOB_ALIGNMENT
+            * metadata.JSONStructCodec.BLOB_ALIGNMENT
+        )
+        assert blob_start % metadata.JSONStructCodec.BLOB_ALIGNMENT == 0
+        assert encoded[blob_start:blob_start + blen] == encoded[blob_start:]
+        assert encoded[json_end:blob_start] == bytes(blob_start - json_end)
+        assert len(encoded) == blob_start + blen
+
     def test_json_defaults_applied(self):
         schema = {
             "codec": "json+struct",

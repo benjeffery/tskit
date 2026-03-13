@@ -205,6 +205,7 @@ class JSONStructCodec(AbstractMetadataCodec):
 
     MAGIC = b"JBLB"
     VERSION = 1
+    BLOB_ALIGNMENT = 8
     _HDR = struct.Struct("<4sBQQ")  # magic, version, json_len, blob_len
 
     @classmethod
@@ -291,10 +292,17 @@ class JSONStructCodec(AbstractMetadataCodec):
         blob_bytes = self.struct_codec.encode(
             {k: v for k, v in obj.items() if k in self._struct_keys}
         )
+        blob_start = self._HDR.size + len(json_bytes)
+        blob_start = (
+            (blob_start + self.BLOB_ALIGNMENT - 1)
+            // self.BLOB_ALIGNMENT
+            * self.BLOB_ALIGNMENT
+        )
         header = self._HDR.pack(
             self.MAGIC, self.VERSION, len(json_bytes), len(blob_bytes)
         )
-        return header + json_bytes + blob_bytes
+        padding_length = blob_start - self._HDR.size - len(json_bytes)
+        return header + json_bytes + (b"\x00" * padding_length) + blob_bytes
 
     def decode(self, encoded: bytes) -> Any:
         if len(encoded) >= self._HDR.size and encoded[:4] == self.MAGIC:
@@ -302,12 +310,21 @@ class JSONStructCodec(AbstractMetadataCodec):
             if version != self.VERSION:
                 raise ValueError("Unsupported json+struct version")
             start = self._HDR.size
+            blob_start = (
+                (start + jlen + self.BLOB_ALIGNMENT - 1)
+                // self.BLOB_ALIGNMENT
+                * self.BLOB_ALIGNMENT
+            )
             if jlen > len(encoded) - start or blen > len(encoded) - start - jlen:
                 raise ValueError(
                     "Invalid json+struct payload: declared lengths exceed buffer size"
                 )
+            if blen > len(encoded) - blob_start:
+                raise ValueError(
+                    "Invalid json+struct payload: declared lengths exceed buffer size"
+                )
             json_bytes = encoded[start : start + jlen]
-            blob_bytes = encoded[start + jlen : start + jlen + blen]
+            blob_bytes = encoded[blob_start : blob_start + blen]
             json_data = self.json_codec.decode(json_bytes)
             struct_data = self.struct_codec.decode(blob_bytes)
             overlap = set(json_data).intersection(struct_data)

@@ -1137,9 +1137,10 @@ int tsk_generate_uuid(char *dest, int flags);
 
 @rst
 Metadata produced by the JSONStructCodec consists of a fixed-size
-header followed by canonical JSON bytes and an optional binary payload. This helper
-validates the framing, returning pointers to the embedded JSON and binary sections
-without copying.
+header followed by canonical JSON bytes, optional padding, and an optional binary
+payload. The binary payload starts at the first 8-byte aligned offset from the
+start of the metadata buffer. This helper validates the framing, returning
+pointers to the embedded JSON and binary sections without copying.
 
 The output pointers reference memory owned by the caller and remain valid only while
 the original metadata buffer is alive.
